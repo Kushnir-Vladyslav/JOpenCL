@@ -96,7 +96,11 @@ public abstract class AbstractGlobalBuffer
         }
 
         if (copyHostBuffer) {
-            hostBuffer = new Object[capacity];
+            if (dataObject instanceof ConvertFromByteBuffer converter) {
+                hostBuffer = converter.createArr(capacity);
+            } else {
+                initErr("Data class doesn't extends of \"ConvertFromByteBuffer\" interface.");
+            }
         }
 
         if (clBuffer == 0) {
@@ -123,7 +127,7 @@ public abstract class AbstractGlobalBuffer
         return newClBuffer;
     }
 
-    public void setup (Class<Data> clazz,
+    public <T extends Data> void setup (Class<T> clazz,
                        OpenClContext context,
                        boolean copyNativeBuffer,
                        boolean copyHostBuffer,
@@ -133,14 +137,15 @@ public abstract class AbstractGlobalBuffer
         setCopyNativeBuffer(copyNativeBuffer);
         setCopyHostBuffer(copyHostBuffer);
         setInitSize(initSize);
+        init();
     }
 
     public long getClBuffer() {
         return clBuffer;
     }
 
-    public void setup (String bufferName,
-                       Class<Data> clazz,
+    public <T extends Data> void setup (String bufferName,
+                       Class<T> clazz,
                        OpenClContext context,
                        boolean copyNativeBuffer,
                        boolean copyHostBuffer,
@@ -151,6 +156,7 @@ public abstract class AbstractGlobalBuffer
         setCopyNativeBuffer(copyNativeBuffer);
         setCopyHostBuffer(copyHostBuffer);
         setInitSize(initSize);
+        init();
     }
 
     @Override

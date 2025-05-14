@@ -15,7 +15,7 @@ public abstract class AbstractBuffer {
 
     private String bufferName = "UnnamedBuffer" + counter.getAndIncrement();
     protected boolean copyNativeBuffer = false;
-    private Class<Data> clazz = null;
+    private Class<?> clazz = null;
     protected OpenClContext openClContext;
 
     protected Data dataObject;
@@ -61,7 +61,7 @@ public abstract class AbstractBuffer {
         return this;
     }
 
-    public AbstractBuffer setDataClass(Class<Data> newClass) {
+    public <T extends Data> AbstractBuffer setDataClass(Class<T> newClass) {
         initCheck();
         clazz = newClass;
 
@@ -86,7 +86,7 @@ public abstract class AbstractBuffer {
             initErr("Data class is invalid.");
         }
         try {
-            dataObject = clazz.getConstructor().newInstance();
+            dataObject = (Data) clazz.getConstructor().newInstance();
         } catch (Exception e) {
             initErr("Data class could not be initialized.");
         }
@@ -120,7 +120,7 @@ public abstract class AbstractBuffer {
         return bufferName;
     }
 
-    public Class<Data> getDataClass () {
+    public Class<?> getDataClass () {
         return clazz;
     }
 

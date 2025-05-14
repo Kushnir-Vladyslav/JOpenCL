@@ -44,7 +44,7 @@ public interface Writable <T extends AbstractGlobalBuffer & Writable<T>> {
                  buffer.clBuffer,
                  true,
                  offset * dataSize,
-                 buffer.nativeBuffer,
+                 tempNativeBuffer,
                  null,
                  null
          );

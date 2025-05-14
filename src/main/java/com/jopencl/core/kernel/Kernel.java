@@ -1,8 +1,8 @@
 package com.jopencl.core.kernel;
 
 import com.jopencl.util.OpenClContext;
-import org.example.Library.LibraryManager;
-import org.example.OldBuffers.BufferManager;
+//import org.example.Library.LibraryManager;
+//import org.example.OldBuffers.BufferManager;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.opencl.CL10;
 import org.lwjgl.system.MemoryStack;
@@ -24,10 +24,10 @@ public abstract class Kernel {
     protected long kernel;     // Ідентифікатор OpenCL ядра
     private long program;   // Ідентифікатор OpenCL програми
 
-    protected static LibraryManager libraryManager = LibraryManager.getInstance();
-
-    // Менеджер що відповідає за створення, зміну та видалення OpenCl буферів
-    protected BufferManager bufferManager;
+//    protected static LibraryManager libraryManager = LibraryManager.getInstance();
+//
+//    // Менеджер що відповідає за створення, зміну та видалення OpenCl буферів
+//    protected BufferManager bufferManager;
 
     // Змінні що потрібні для роботи з буферами OpenCL та ядрами
     protected OpenClContext openClContext;
@@ -46,61 +46,61 @@ public abstract class Kernel {
      * @throws RuntimeException         Якщо не вдається створити або скомпілювати ядро.
      */
     protected Kernel (String kernelName, String kernelFile, String... libraries) {
-        bufferManager = BufferManager.getInstance();
-
-        openClContext = OpenClContext.getInstance();
-
-        String kernelSource = "";
-
-        for (String library : libraries) {
-            kernelSource += libraryManager.getLibrary(library);
-        }
-
-        URL URLKernelSource = getClass().getResource(kernelFile);
-
-        if(URLKernelSource == null) {
-            throw new IllegalStateException("The kernel code file was not found.");
-        }
-
-        try {
-            kernelSource += Files.readString(Paths.get(URLKernelSource.toURI()));
-        } catch (IOException | URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-
-        modifyKernelSours(kernelSource);
-
-        // Компіляція та створення kernel
-        program = CL10.clCreateProgramWithSource(openClContext.context, kernelSource, null);
-        if (program == 0) {
-            throw new RuntimeException("Failed to create OpenCL program");
-        }
-
-        int buildStatus = CL10.clBuildProgram(program, openClContext.device, "", null, 0);
-        if (buildStatus != CL10.CL_SUCCESS) {
-            // Отримання журналу компіляції
-            PointerBuffer sizeBuffer = MemoryStack.stackMallocPointer(1);
-            CL10.clGetProgramBuildInfo(program, openClContext.device, CL10.CL_PROGRAM_BUILD_LOG, (ByteBuffer) null, sizeBuffer);
-
-            ByteBuffer buildLogBuffer = MemoryStack.stackMalloc((int) sizeBuffer.get(0));
-            CL10.clGetProgramBuildInfo(program, openClContext.device, CL10.CL_PROGRAM_BUILD_LOG, buildLogBuffer, null);
-
-            String buildLog = MemoryUtil.memUTF8(buildLogBuffer);
-            System.err.println("Build log:\n" + buildLog);
-            throw new RuntimeException("Failed to build OpenCL program.");
-        }
-
-        IntBuffer errorBuffer = MemoryUtil.memAllocInt(1);
-
-        kernel = CL10.clCreateKernel(program, kernelName, errorBuffer);
-
-        int error = errorBuffer.get(0);
-        MemoryUtil.memFree(errorBuffer);
-
-        // Перевірка чи правельно пройшла уомпіляція
-        if (kernel == 0) {
-            throw new RuntimeException("Failed to create kernel: " + kernelName + ".\n Error code: " + error);
-        }
+//        bufferManager = BufferManager.getInstance();
+//
+//        openClContext = OpenClContext.getInstance();
+//
+//        String kernelSource = "";
+//
+//        for (String library : libraries) {
+//            kernelSource += libraryManager.getLibrary(library);
+//        }
+//
+//        URL URLKernelSource = getClass().getResource(kernelFile);
+//
+//        if(URLKernelSource == null) {
+//            throw new IllegalStateException("The kernel code file was not found.");
+//        }
+//
+//        try {
+//            kernelSource += Files.readString(Paths.get(URLKernelSource.toURI()));
+//        } catch (IOException | URISyntaxException e) {
+//            throw new RuntimeException(e);
+//        }
+//
+//        modifyKernelSours(kernelSource);
+//
+//        // Компіляція та створення kernel
+//        program = CL10.clCreateProgramWithSource(openClContext.context, kernelSource, null);
+//        if (program == 0) {
+//            throw new RuntimeException("Failed to create OpenCL program");
+//        }
+//
+//        int buildStatus = CL10.clBuildProgram(program, openClContext.device, "", null, 0);
+//        if (buildStatus != CL10.CL_SUCCESS) {
+//            // Отримання журналу компіляції
+//            PointerBuffer sizeBuffer = MemoryStack.stackMallocPointer(1);
+//            CL10.clGetProgramBuildInfo(program, openClContext.device, CL10.CL_PROGRAM_BUILD_LOG, (ByteBuffer) null, sizeBuffer);
+//
+//            ByteBuffer buildLogBuffer = MemoryStack.stackMalloc((int) sizeBuffer.get(0));
+//            CL10.clGetProgramBuildInfo(program, openClContext.device, CL10.CL_PROGRAM_BUILD_LOG, buildLogBuffer, null);
+//
+//            String buildLog = MemoryUtil.memUTF8(buildLogBuffer);
+//            System.err.println("Build log:\n" + buildLog);
+//            throw new RuntimeException("Failed to build OpenCL program.");
+//        }
+//
+//        IntBuffer errorBuffer = MemoryUtil.memAllocInt(1);
+//
+//        kernel = CL10.clCreateKernel(program, kernelName, errorBuffer);
+//
+//        int error = errorBuffer.get(0);
+//        MemoryUtil.memFree(errorBuffer);
+//
+//        // Перевірка чи правельно пройшла уомпіляція
+//        if (kernel == 0) {
+//            throw new RuntimeException("Failed to create kernel: " + kernelName + ".\n Error code: " + error);
+//        }
     }
 
     /**

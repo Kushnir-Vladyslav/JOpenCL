@@ -10,7 +10,13 @@ public class OpenClContext {
 
     public BufferManager bufferManager = new BufferManager();
 
+
+
     public void destroy () {
+        bufferManager.releaseAll();
+
+
+
         if(commandQueue != 0) {
             CL10.clReleaseCommandQueue(commandQueue);
             commandQueue = 0;
