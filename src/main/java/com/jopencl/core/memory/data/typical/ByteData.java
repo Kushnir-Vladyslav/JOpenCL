@@ -11,31 +11,30 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-
 /**
- * Implementation of floating-point data type for OpenCL operations.
- * Supports float[], Float[], and Float primitive types.
+ * Implementation of byte data type for OpenCL operations.
+ * Supports byte[], Byte[], and Byte primitive types.
  *
- * <p>This class provides conversion and buffer management for floating-point data,
+ * <p>This class provides conversion and buffer management for byte data,
  * supporting both primitive and boxed types. It includes optimized handling for
  * different input formats while maintaining type safety and null checking.</p>
  *
  * <p>Example usage:</p>
  * <pre>
- * FloatData floatData = new FloatData();
+ * ByteData byteData = new ByteData();
  *
  * // Using primitive array
- * float[] primitiveArray = {1.0f, 2.0f, 3.0f};
- * int size = floatData.getSizeArray(primitiveArray);
- * ByteBuffer buffer = ByteBuffer.allocate(size * floatData.getSizeStruct());
- * floatData.convertToByteBuffer(buffer, primitiveArray);
+ * byte[] primitiveArray = {1, 2, 3};
+ * int size = byteData.getSizeArray(primitiveArray);
+ * ByteBuffer buffer = ByteBuffer.allocate(size * byteData.getSizeStruct());
+ * byteData.convertToByteBuffer(buffer, primitiveArray);
  *
  * // Using boxed array
- * Float[] boxedArray = {1.0f, 2.0f, 3.0f};
- * floatData.convertToByteBuffer(buffer, boxedArray);
+ * Byte[] boxedArray = {1, 2, 3};
+ * byteData.convertToByteBuffer(buffer, boxedArray);
  *
  * // Using single value
- * floatData.convertToByteBuffer(buffer, 1.0f);
+ * byteData.convertToByteBuffer(buffer, (byte)1);
  * </pre>
  *
  * @author Vladyslav Kushnir
@@ -44,15 +43,15 @@ import java.util.Arrays;
  * @see ConvertFromByteBuffer
  * @since 1.0
  */
-public class FloatData implements Data, ConvertFromByteBuffer, ConvertToByteBuffer {
-    private static final Logger logger = LoggerFactory.getLogger(FloatData.class);
+public class ByteData implements Data, ConvertFromByteBuffer, ConvertToByteBuffer {
+    private static final Logger logger = LoggerFactory.getLogger(ByteData.class);
 
     /**
      * {@inheritDoc}
-     * Supports converting to float[], Float[], and Float types.
+     * Supports converting to byte[], Byte[], and Byte types.
      *
      * @param buffer the source buffer
-     * @param target the target object (float[], Float[], or Float)
+     * @param target the target object (byte[], Byte[], or Byte)
      * @throws IllegalArgumentException if target is null or of unsupported type
      * @throws BufferUnderflowException if buffer has insufficient data
      */
@@ -65,13 +64,13 @@ public class FloatData implements Data, ConvertFromByteBuffer, ConvertToByteBuff
         }
 
         try {
-            if (target instanceof float[]) {
-                convertBufferToPrimitiveArray(buffer, (float[]) target);
-            } else if (target instanceof Float[]) {
-                convertBufferToBoxedArray(buffer, (Float[]) target);
+            if (target instanceof byte[]) {
+                convertBufferToPrimitiveArray(buffer, (byte[]) target);
+            } else if (target instanceof Byte[]) {
+                convertBufferToBoxedArray(buffer, (Byte[]) target);
             } else {
                 String message = String.format(
-                        "Unsupported target type: %s. Expected float[], Float[] or Float",
+                        "Unsupported target type: %s. Expected byte[], Byte[] or Byte",
                         target.getClass().getSimpleName()
                 );
                 logger.error(message);
@@ -84,29 +83,28 @@ public class FloatData implements Data, ConvertFromByteBuffer, ConvertToByteBuff
         }
     }
 
-
     /**
-     * Converts ByteBuffer data to a primitive float array.
+     * Converts ByteBuffer data to a primitive byte array.
      *
      * @param buffer the source buffer
      * @param target the target array
      */
-    private void convertBufferToPrimitiveArray(ByteBuffer buffer, float[] target) {
-        logger.debug("Converting buffer to primitive float array of length: {}", target.length);
-        buffer.asFloatBuffer().get(target);
+    private void convertBufferToPrimitiveArray(ByteBuffer buffer, byte[] target) {
+        logger.debug("Converting buffer to primitive byte array of length: {}", target.length);
+        buffer.get(target);
     }
 
     /**
-     * Converts ByteBuffer data to a boxed Float array.
+     * Converts ByteBuffer data to a boxed Byte array.
      *
      * @param buffer the source buffer
      * @param target the target array
      */
-    private void convertBufferToBoxedArray(ByteBuffer buffer, Float[] target) {
-        logger.debug("Converting buffer to boxed Float array of length: {}", target.length);
+    private void convertBufferToBoxedArray(ByteBuffer buffer, Byte[] target) {
+        logger.debug("Converting buffer to boxed Byte array of length: {}", target.length);
 
-        float[] temp = new float[target.length];
-        buffer.asFloatBuffer().get(temp);
+        byte[] temp = new byte[target.length];
+        buffer.get(temp);
 
         for (int i = 0; i < temp.length; i++) {
             target[i] = temp[i];
@@ -115,27 +113,27 @@ public class FloatData implements Data, ConvertFromByteBuffer, ConvertToByteBuff
 
     /**
      * {@inheritDoc}
-     * Creates a new float array of the specified size.
+     * Creates a new byte array of the specified size.
      *
      * @param size the size of the array to create
-     * @return a new float array
+     * @return a new byte array
      * @throws IllegalArgumentException if size is negative
      */
     @Override
     public Object createArr(int size) {
         validateSize(size, "array size");
-        logger.debug("Creating new float array of size: {}", size);
-        return new float[size];
+        logger.debug("Creating new byte array of size: {}", size);
+        return new byte[size];
     }
 
     /**
      * {@inheritDoc}
-     * Supports converting from float[], Float[], and Float types.
+     * Supports converting from byte[], Byte[], and Byte types.
      *
      * @param buffer the destination buffer
      * @param source the source data
      * @throws IllegalArgumentException if source is null, contains null elements, or is of unsupported type
-     * @throws BufferOverflowException  if buffer has insufficient space
+     * @throws BufferOverflowException if buffer has insufficient space
      */
     @Override
     public void convertToByteBuffer(ByteBuffer buffer, Object source) {
@@ -145,77 +143,73 @@ public class FloatData implements Data, ConvertFromByteBuffer, ConvertToByteBuff
             throw new IllegalArgumentException(message);
         }
 
-
-        if (source instanceof float[]) {
-            convertPrimitiveArrayToBuffer(buffer, (float[]) source);
-        } else if (source instanceof Float[]) {
-            convertBoxedArrayToBuffer(buffer, (Float[]) source);
-        } else if (source instanceof Float) {
-            buffer.putFloat((Float) source);
+        if (source instanceof byte[]) {
+            convertPrimitiveArrayToBuffer(buffer, (byte[]) source);
+        } else if (source instanceof Byte[]) {
+            convertBoxedArrayToBuffer(buffer, (Byte[]) source);
+        } else if (source instanceof Byte) {
+            buffer.put((Byte) source);
         } else {
             String message = String.format(
-                    "Unsupported source type: %s. Expected float[], Float[] or Float",
+                    "Unsupported source type: %s. Expected byte[], Byte[] or Byte",
                     source.getClass().getSimpleName()
             );
             logger.error(message);
             throw new IllegalArgumentException(message);
         }
-
     }
 
     /**
-     * Converts a primitive float array to ByteBuffer.
+     * Converts a primitive byte array to ByteBuffer.
      *
      * @param buffer the destination buffer
      * @param source the source array
      */
-    private void convertPrimitiveArrayToBuffer(ByteBuffer buffer, float[] source) {
-        logger.debug("Converting primitive float array of length: {}", source.length);
-        buffer.asFloatBuffer().put(source);
-        buffer.position(buffer.position() + source.length * Float.BYTES);
+    private void convertPrimitiveArrayToBuffer(ByteBuffer buffer, byte[] source) {
+        logger.debug("Converting primitive byte array of length: {}", source.length);
+        buffer.put(source);
     }
 
     /**
-     * Converts a boxed Float array to ByteBuffer.
+     * Converts a boxed Byte array to ByteBuffer.
      * Performs null checking on array elements.
      *
      * @param buffer the destination buffer
      * @param source the source array
      * @throws NullPointerException if any element is null
      */
-    private void convertBoxedArrayToBuffer(ByteBuffer buffer, Float[] source) {
-        logger.debug("Converting boxed Float array of length: {}", source.length);
+    private void convertBoxedArrayToBuffer(ByteBuffer buffer, Byte[] source) {
+        logger.debug("Converting boxed Byte array of length: {}", source.length);
 
-        if (Arrays.stream(source).anyMatch(f -> f == null)) {
-            String message = "Float array contains null elements";
+        if (Arrays.stream(source).anyMatch(b -> b == null)) {
+            String message = "Byte array contains null elements";
             logger.error(message);
             throw new NullPointerException(message);
         }
 
-        float[] primitiveArray = new float[source.length];
+        byte[] primitiveArray = new byte[source.length];
         for (int i = 0; i < source.length; i++) {
             primitiveArray[i] = source[i];
         }
-        buffer.asFloatBuffer().put(primitiveArray);
-        buffer.position(buffer.position() + source.length * Float.BYTES);
+        buffer.put(primitiveArray);
     }
 
     /**
      * {@inheritDoc}
      *
-     * @return size of float in bytes (4 bytes)
+     * @return size of byte in bytes (1 byte)
      */
     @Override
     public int getSizeStruct() {
-        return Float.BYTES;
+        return Byte.BYTES;
     }
 
     /**
      * {@inheritDoc}
-     * Supports float[], Float[], and Float types.
+     * Supports byte[], Byte[], and Byte types.
      *
      * @param arr the array or value to measure
-     * @return the number of elements; 1 for single Float value
+     * @return the number of elements; 1 for single Byte value
      * @throws IllegalArgumentException if the input is null or of unsupported type
      */
     @Override
@@ -226,20 +220,19 @@ public class FloatData implements Data, ConvertFromByteBuffer, ConvertToByteBuff
             throw new IllegalArgumentException(message);
         }
 
-        if (arr instanceof float[]) {
-            return ((float[]) arr).length;
-        } else if (arr instanceof Float[]) {
-            return ((Float[]) arr).length;
-        } else if (arr instanceof Float) {
+        if (arr instanceof byte[]) {
+            return ((byte[]) arr).length;
+        } else if (arr instanceof Byte[]) {
+            return ((Byte[]) arr).length;
+        } else if (arr instanceof Byte) {
             return 1;
         }
 
         String message = String.format(
-                "Unsupported type: %s. Expected float[], Float[] or Float",
+                "Unsupported type: %s. Expected byte[], Byte[] or Byte",
                 arr.getClass().getSimpleName()
         );
         logger.error(message);
         throw new IllegalArgumentException(message);
     }
-
 }
