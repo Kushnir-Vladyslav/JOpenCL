@@ -34,28 +34,29 @@ public class BuffersTest {
         long kernel;     // Ідентифікатор OpenCL ядра
         long program;
 
-        String kernelSource = """
-                __kernel void TestKernel(__global const float *a,
-                                         __global const float *b,
-                                         __global float *result,
-                                         __local float *local_a,
-                                         __local float *local_b,
-                                         const int num)
-                {
-                    int gid = get_global_id(0);
-                    int lid = get_local_id(0);
-                    int group_size = get_local_size(0);
-                
-                    // "Завантаження даних в локальну пам'ять"
-                    local_a[lid] = a[gid];
-                    local_b[lid] = b[gid];
-                
-                    // "Синхронізація локальної групи"
-                    barrier(CLK_LOCAL_MEM_FENCE);
-                    // "Додавання з використанням локальної пам'яті"
-                    result[gid] = local_a[lid] + local_b[lid] + num;
-                }
-                """;
+        String kernelSource = " ";
+//        String kernelSource = """
+//                __kernel void TestKernel(__global const float *a,
+//                                         __global const float *b,
+//                                         __global float *result,
+//                                         __local float *local_a,
+//                                         __local float *local_b,
+//                                         const int num)
+//                {
+//                    int gid = get_global_id(0);
+//                    int lid = get_local_id(0);
+//                    int group_size = get_local_size(0);
+//
+//                    // "Завантаження даних в локальну пам'ять"
+//                    local_a[lid] = a[gid];
+//                    local_b[lid] = b[gid];
+//
+//                    // "Синхронізація локальної групи"
+//                    barrier(CLK_LOCAL_MEM_FENCE);
+//                    // "Додавання з використанням локальної пам'яті"
+//                    result[gid] = local_a[lid] + local_b[lid] + num;
+//                }
+//                """;
 
         String kernelName = "TestKernel";
 
@@ -142,7 +143,7 @@ public class BuffersTest {
         IntBuffer num = MemoryUtil.memAllocInt(1);
         num.put(5);
 
-        CL10.clSetKernelArg(kernel, 5,num.rewind());
+        CL10.clSetKernelArg(kernel, 5, (IntBuffer) num.rewind());
 
         // Виконання kernel з явним розміром локальної групи
         long globalWorkSize = (long) Math.ceil(VECTOR_SIZE / (float) LOCAL_WORK_SIZE) * LOCAL_WORK_SIZE;
