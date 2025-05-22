@@ -15,10 +15,10 @@ import org.slf4j.LoggerFactory;
  * from implementing classes.</p>
  *
  * @param <T> the concrete buffer type that implements this interface
- * @since 1.0
  * @author Vladyslav Kushnir
+ * @since 1.0
  */
-public interface Dynamical <T extends AbstractGlobalBuffer & Dynamical<T>> {
+public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
     Logger logger = LoggerFactory.getLogger(Dynamical.class);
 
     /**
@@ -58,7 +58,7 @@ public interface Dynamical <T extends AbstractGlobalBuffer & Dynamical<T>> {
      * @param newCapacity the required capacity for the buffer
      * @throws IllegalArgumentException if requiredCapacity is negative
      */
-    default void resize (int newCapacity) {
+    default void resize(int newCapacity) {
         if (newCapacity < 0) {
             String message = String.format(
                     "Required capacity cannot be negative: %d",
@@ -88,7 +88,7 @@ public interface Dynamical <T extends AbstractGlobalBuffer & Dynamical<T>> {
         @SuppressWarnings("unchecked")
         T buffer = (T) this;
         int currentCapacity = buffer.getCapacity();
-        
+
         if (newCapacity > currentCapacity) {
             long oldClBuffer = buffer.clBuffer;
 
@@ -96,14 +96,26 @@ public interface Dynamical <T extends AbstractGlobalBuffer & Dynamical<T>> {
                 buffer.capacity = newCapacity;
                 buffer.clBuffer = buffer.createClBuffer();
 
-                CopyDataBufferToBuffer.copyData(
+                int errorCode = CopyDataBufferToBuffer.copyData(
                         buffer.openClContext,
                         oldClBuffer,
                         buffer.getClBuffer(),
                         currentCapacity
                 );
 
-                CL10.clReleaseMemObject(oldClBuffer);
+                if (errorCode != CL10.CL_SUCCESS) {
+                    String message = String.format(
+                            "Failed to copy data during buffer increase: OpenCL error code %d",
+                            errorCode);
+                    logger.error(message);
+                    throw new IllegalStateException(message);
+                }
+
+                errorCode = CL10.clReleaseMemObject(oldClBuffer);
+                if (errorCode != CL10.CL_SUCCESS) {
+                    logger.warn("Failed to release old buffer memory object: OpenCL error code {}",
+                            errorCode);
+                }
 
                 buffer.setAllKernelArgs();
             } catch (Exception e) {
@@ -136,19 +148,30 @@ public interface Dynamical <T extends AbstractGlobalBuffer & Dynamical<T>> {
             long oldClBuffer = buffer.clBuffer;
 
             try {
-            buffer.capacity = newCapacity;
-            buffer.clBuffer = buffer.createClBuffer();
+                buffer.capacity = newCapacity;
+                buffer.clBuffer = buffer.createClBuffer();
 
-            CopyDataBufferToBuffer.copyData(
-                    buffer.openClContext,
-                    oldClBuffer,
-                    buffer.clBuffer,
-                    newCapacity);
+                int errorCode = CopyDataBufferToBuffer.copyData(
+                        buffer.openClContext,
+                        oldClBuffer,
+                        buffer.clBuffer,
+                        newCapacity);
 
+                if (errorCode != CL10.CL_SUCCESS) {
+                    String message = String.format(
+                            "Failed to copy data during buffer decrease: OpenCL error code %d",
+                            errorCode);
+                    logger.error(message);
+                    throw new IllegalStateException(message);
+                }
 
-            CL10.clReleaseMemObject(oldClBuffer);
+                errorCode = CL10.clReleaseMemObject(oldClBuffer);
+                if (errorCode != CL10.CL_SUCCESS) {
+                    logger.warn("Failed to release old buffer memory object: OpenCL error code {}",
+                            errorCode);
+                }
 
-            buffer.setAllKernelArgs();
+                buffer.setAllKernelArgs();
 
             } catch (Exception e) {
                 CL10.clReleaseMemObject(buffer.clBuffer);
@@ -164,7 +187,7 @@ public interface Dynamical <T extends AbstractGlobalBuffer & Dynamical<T>> {
      * This is useful when the amount of data has significantly decreased and
      * is expected to stay small, helping to free unused memory.
      */
-    default void compact () {
+    default void compact() {
         @SuppressWarnings("unchecked")
         T buffer = (T) this;
 

@@ -4,81 +4,258 @@ import com.jopencl.core.memory.data.ConvertToByteBuffer;
 import com.jopencl.core.memory.util.CopyDataBufferToBuffer;
 import org.lwjgl.opencl.CL10;
 import org.lwjgl.system.MemoryUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 
-public interface Writable <T extends AbstractGlobalBuffer & Writable<T>> {
+/**
+ * Interface for OpenCL buffers that support write operations.
+ * Provides methods for writing data to OpenCL buffer and managing buffer content.
+ *
+ * <p>This interface implements write operations for OpenCL buffers by working in conjunction
+ * with {@link AbstractGlobalBuffer}. It provides complete implementation of write operations
+ * without requiring additional implementation from implementing classes.</p>
+ *
+ * @param <T> The type of buffer that implements this interface
+ * @author Vladyslav Kushnir
+ * @since 1.0
+ */
+public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
+    Logger logger = LoggerFactory.getLogger(Writable.class);
+
+    /**
+     * Writes data to the buffer starting from the beginning.
+     *
+     * @param arr the data array to write
+     * @throws IllegalArgumentException if the input array is null
+     * @throws IllegalStateException    if the write operation fails
+     */
     default void write(Object arr) {
+        if (arr == null) {
+            String message = "Input array cannot be null";
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
         write(arr, 0);
     }
 
+    /**
+     * Writes data to the buffer starting at specified offset.
+     *
+     * @param arr    the data array to write
+     * @param offset starting position in the buffer
+     * @throws IllegalArgumentException if the input array is null or offset is negative
+     * @throws IllegalStateException    if the write operation fails
+     */
     default void write(Object arr, int offset) {
-         T buffer = (T) this;
+        @SuppressWarnings("unchecked")
+        T buffer = (T) this;
 
-         ConvertToByteBuffer converter = (ConvertToByteBuffer) buffer.dataObject;
+        if (arr == null) {
+            String message = String.format("Input array cannot be null for buffer '%s'",
+                    buffer.getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
 
-         int arrSize = buffer.dataObject.getSizeArray(arr);
-         int dataSize = buffer.dataObject.getSizeStruct();
+        if (offset < 0) {
+            String message = String.format("Offset cannot be negative: %d for buffer '%s'",
+                    offset, buffer.getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
 
-         if (arrSize + offset > buffer.capacity) {
-             if (buffer.dynamic) {
-                 Dynamical<?> dynamical = (Dynamical<?>) buffer;
-                 dynamical.resize((int) ((arrSize + offset) * 1.5));
-             } else {
-                 throw new IllegalStateException("Size of data array is bigger than size of static OpenCL buffer.");
-             }
-         }
+        ConvertToByteBuffer converter = (ConvertToByteBuffer) buffer.dataObject;
 
-        ByteBuffer tempNativeBuffer;
+        int arrSize = buffer.dataObject.getSizeArray(arr);
+        int dataSize = buffer.dataObject.getSizeStruct();
 
-         if (buffer.dynamic) {
-             tempNativeBuffer = buffer.nativeBuffer.rewind().limit(arrSize * dataSize);
-         } else {
-             tempNativeBuffer = MemoryUtil.memAlloc(arrSize * dataSize);
-         }
+        if (arrSize + offset > buffer.capacity) {
+            if (buffer instanceof Dynamical<?> dynamical) {
+                logger.debug("Resizing dynamic buffer '{}' to accommodate new data",
+                        buffer.getBufferName());
+                dynamical.resize((int) ((arrSize + offset) * 1.5));
+            } else {
+                String message = String.format(
+                        "Data size (%d) exceeds static buffer capacity (%d) for buffer '%s'",
+                        arrSize + offset, buffer.capacity, buffer.getBufferName());
+                logger.error(message);
+                throw new IllegalStateException(message);
+            }
+        }
 
-         converter.convertToByteBuffer(tempNativeBuffer, arr);
+        ByteBuffer tempNativeBuffer = null;
 
-         CL10.clEnqueueWriteBuffer(
-                 buffer.openClContext.commandQueue,
-                 buffer.clBuffer,
-                 true,
-                 offset * dataSize,
-                 tempNativeBuffer,
-                 null,
-                 null
-         );
+        try {
+            if (buffer instanceof Dynamical<?>) {
+                tempNativeBuffer = buffer.nativeBuffer.rewind().limit(arrSize * dataSize);
+                logger.trace("Using existing native buffer for dynamic buffer '{}'",
+                        buffer.getBufferName());
+            } else {
+                tempNativeBuffer = MemoryUtil.memAlloc(arrSize * dataSize);
+                if (tempNativeBuffer == null) {
+                    String message = String.format(
+                            "Failed to allocate temporary native buffer for buffer '%s'",
+                            buffer.getBufferName());
+                    logger.error(message);
+                    throw new IllegalStateException(message);
+                }
+                logger.trace("Allocated temporary native buffer for static buffer '{}'",
+                        buffer.getBufferName());
+            }
 
-         buffer.size += arrSize;
+            converter.convertToByteBuffer(tempNativeBuffer, arr);
 
-        if (buffer.dynamic) {
-            buffer.nativeBuffer.clear();
-        } else {
-            MemoryUtil.memFree(tempNativeBuffer);
+            logger.debug("Writing {} elements to buffer '{}' at offset {}",
+                    arrSize, buffer.getBufferName(), offset);
+
+            int errorCode = CL10.clEnqueueWriteBuffer(
+                    buffer.openClContext.commandQueue,
+                    buffer.clBuffer,
+                    true,
+                    offset * dataSize,
+                    tempNativeBuffer,
+                    null,
+                    null
+            );
+
+            if (errorCode != CL10.CL_SUCCESS) {
+                String message = String.format(
+                        "OpenCL write buffer failed for buffer '%s': error code %d",
+                        buffer.getBufferName(), errorCode);
+                logger.error(message);
+                throw new IllegalStateException(message);
+            }
+
+            buffer.size += arrSize;
+
+            logger.debug("Successfully wrote data to buffer '{}', new size: {}",
+                    buffer.getBufferName(), buffer.size);
+
+        }catch (Exception e) {
+            String message = String.format("Failed to write to buffer '%s'", buffer.getBufferName());
+            logger.error(message, e);
+            throw new IllegalStateException(message, e);
+        } finally {
+            if (!(buffer instanceof Dynamical<?>) && tempNativeBuffer != null) {
+                MemoryUtil.memFree(tempNativeBuffer);
+                logger.trace("Freed temporary native buffer for static buffer '{}'",
+                        buffer.getBufferName());
+            } else if (buffer instanceof Dynamical<?> && tempNativeBuffer != null) {
+                buffer.nativeBuffer.clear();
+            }
         }
     }
 
-    default void add (Object arr) {
+    /**
+     * Appends data to the end of the buffer.
+     *
+     * @param arr the data array to append
+     * @throws IllegalArgumentException if the input array is null
+     * @throws IllegalStateException if the write operation fails
+     */
+    default void add(Object arr) {
+        @SuppressWarnings("unchecked")
         T buffer = (T) this;
+        if (arr == null) {
+            String message = String.format("Input array cannot be null for buffer '%s'",
+                    buffer.getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
+
+        logger.debug("Adding data to the end of buffer '{}' at position {}",
+                buffer.getBufferName(), buffer.size);
         write(arr, buffer.size);
     }
 
-    default void remove (int index) {
+    /**
+     * Removes one element at the specified index.
+     *
+     * @param index the position from which to remove the element
+     * @throws IllegalArgumentException if the index is invalid
+     * @throws IllegalStateException if the remove operation fails
+     */
+    default void remove(int index) {
         remove(index, 1);
     }
 
-    default void remove (int index, int num) {
+    /**
+     * Removes specified number of elements starting at the given index.
+     * For dynamic buffers, also checks if buffer should be shrunk after removal.
+     *
+     * @param index starting position from which to remove elements
+     * @param num number of elements to remove
+     * @throws IllegalArgumentException if the index or number is invalid
+     * @throws IllegalStateException if the remove operation fails
+     */
+    default void remove(int index, int num) {
+        @SuppressWarnings("unchecked")
         T buffer = (T) this;
-        int dataSize = buffer.dataObject.getSizeStruct();
 
-        CopyDataBufferToBuffer.copyData(
+        if (index < 0) {
+            String message = String.format("Index cannot be negative: %d for buffer '%s'",
+                    index, buffer.getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
+
+        if (num <= 0) {
+            String message = String.format("Number of elements to remove must be positive: %d for buffer '%s'",
+                    num, buffer.getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
+
+        if (index + num > buffer.size) {
+            String message = String.format(
+                    "Cannot remove elements beyond buffer size: index=%d, count=%d, size=%d for buffer '%s'",
+                    index, num, buffer.size, buffer.getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
+
+        int dataSize = buffer.dataObject.getSizeStruct();
+        logger.debug("Removing {} elements from buffer '{}' at index {}",
+                num, buffer.getBufferName(), index);
+
+        int errorCode = CopyDataBufferToBuffer.copyData(
                 buffer.openClContext,
                 buffer.clBuffer,
                 buffer.clBuffer,
-                (index) * dataSize,
                 (index + num) * dataSize,
+                index * dataSize,
                 (buffer.size - index - num) * dataSize);
 
+        if (errorCode != CL10.CL_SUCCESS) {
+            String message = String.format(
+                    "Failed to remove elements from buffer '%s': OpenCL error code %d",
+                    buffer.getBufferName(), errorCode);
+            logger.error(message);
+            throw new IllegalStateException(message);
+        }
+
         buffer.size -= num;
+        logger.debug("Successfully removed elements from buffer '{}', new size: {}",
+                buffer.getBufferName(), buffer.size);
+
+        if (buffer instanceof Dynamical<?> dynamical) {
+            double capacityRatio = (double) buffer.capacity / buffer.size;
+
+            if (capacityRatio > dynamical.getShrinkFactor()) {
+                logger.debug("Buffer '{}' capacity ratio ({}) exceeds shrink factor ({}), resizing...",
+                        buffer.getBufferName(), capacityRatio, dynamical.getShrinkFactor());
+
+                int newCapacity = (int) Math.ceil(buffer.size * dynamical.getCapacityMultiplier());
+                newCapacity = Math.max(newCapacity, dynamical.getMinCapacity());
+
+                logger.debug("Shrinking buffer '{}' capacity from {} to {}",
+                        buffer.getBufferName(), buffer.capacity, newCapacity);
+
+                dynamical.resize(newCapacity);
+            }
+        }
+
     }
 }

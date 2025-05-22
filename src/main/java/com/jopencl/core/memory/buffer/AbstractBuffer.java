@@ -37,7 +37,7 @@ public abstract class AbstractBuffer {
     private boolean initiated = false;
 
     private String bufferName;
-    protected boolean copyNativeBuffer = false;
+
     private Class<?> clazz = null;
     protected OpenClContext openClContext;
 
@@ -84,20 +84,6 @@ public abstract class AbstractBuffer {
         }
         logger.debug("Setting buffer name from '{}' to '{}'", this.bufferName, name);
         bufferName = name.trim();
-        return this;
-    }
-
-    /**
-     * Configures whether the buffer should maintain a native copy.
-     *
-     * @param copyNativeBuffer true to maintain a native copy, false otherwise
-     * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
-     */
-    public AbstractBuffer setCopyNativeBuffer(boolean copyNativeBuffer) {
-        initCheck();
-        logger.debug("Setting copyNativeBuffer to {} for buffer '{}'", copyNativeBuffer, bufferName);
-        this.copyNativeBuffer = copyNativeBuffer;
         return this;
     }
 
@@ -175,7 +161,6 @@ public abstract class AbstractBuffer {
 
         try {
             initializeDataObject();
-            initializeNativeBuffer();
             registerWithContext();
 
             if (this instanceof AdditionalLifecycle additionalLifecycle) {
@@ -221,19 +206,6 @@ public abstract class AbstractBuffer {
         }
     }
 
-    private void initializeNativeBuffer() {
-        if (copyNativeBuffer) {
-            try {
-                nativeBuffer = MemoryUtil.memAlloc(capacity);
-                if (nativeBuffer == null) {
-                    throwInitError("Failed to allocate native buffer");
-                }
-            } catch (Exception e) {
-                throwInitError("Failed to allocate native buffer: " + e.getMessage());
-            }
-        }
-    }
-
     private void registerWithContext() {
         try {
             openClContext.bufferManager.registerBuffer(this);
@@ -242,7 +214,7 @@ public abstract class AbstractBuffer {
         }
     }
 
-    private void throwInitError(String message) {
+    protected void throwInitError(String message) {
         String fullMessage = String.format("Initialization error for buffer '%s': %s", bufferName, message);
         logger.error(fullMessage);
         throw new IllegalStateException(fullMessage);
