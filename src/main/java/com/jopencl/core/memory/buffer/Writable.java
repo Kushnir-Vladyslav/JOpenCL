@@ -72,7 +72,8 @@ public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
         int dataSize = buffer.dataObject.getSizeStruct();
 
         if (arrSize + offset > buffer.capacity) {
-            if (buffer instanceof Dynamical<?> dynamical) {
+            if (buffer instanceof Dynamical<?>) {
+                Dynamical<?> dynamical = (Dynamical<?>) this;
                 logger.debug("Resizing dynamic buffer '{}' to accommodate new data",
                         buffer.getBufferName());
                 dynamical.resize((int) ((arrSize + offset) * 1.5));
@@ -89,7 +90,7 @@ public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
 
         try {
             if (buffer instanceof Dynamical<?>) {
-                tempNativeBuffer = buffer.nativeBuffer.rewind().limit(arrSize * dataSize);
+                tempNativeBuffer = (ByteBuffer) buffer.nativeBuffer.rewind().limit(arrSize * dataSize);
                 logger.trace("Using existing native buffer for dynamic buffer '{}'",
                         buffer.getBufferName());
             } else {
@@ -240,7 +241,8 @@ public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
         logger.debug("Successfully removed elements from buffer '{}', new size: {}",
                 buffer.getBufferName(), buffer.size);
 
-        if (buffer instanceof Dynamical<?> dynamical) {
+        if (buffer instanceof Dynamical<?>) {
+            Dynamical<?> dynamical = (Dynamical<?>) this;
             double capacityRatio = (double) buffer.capacity / buffer.size;
 
             if (capacityRatio > dynamical.getShrinkFactor()) {

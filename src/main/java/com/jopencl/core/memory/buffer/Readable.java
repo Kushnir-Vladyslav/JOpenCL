@@ -208,7 +208,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
 
         try {
             if (buffer.copyHostBuffer) {
-                tempNativeBuffer = buffer.nativeBuffer.rewind().limit(len);
+                tempNativeBuffer = (ByteBuffer) buffer.nativeBuffer.rewind().limit(len);
             } else {
                 tempNativeBuffer = MemoryUtil.memAlloc(len * data.getSizeStruct());
                 if (tempNativeBuffer == null) {
@@ -237,7 +237,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                 throw new IllegalStateException(message);
             }
 
-            converter.convertFromByteBuffer(tempNativeBuffer.rewind(), targetArray);
+            converter.convertFromByteBuffer((ByteBuffer) tempNativeBuffer.rewind(), targetArray);
 
             if (buffer.copyHostBuffer) {
                 buffer.nativeBuffer.clear();
@@ -324,9 +324,14 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
 
         int len = (buffer.size - offset)
                 * buffer.dataObject.getSizeStruct();
-        ByteBuffer tempNativeBuffer = buffer
+        ByteBuffer tempNativeBuffer = (ByteBuffer) buffer
                 .nativeBuffer
-                .slice(0, len);
+                .position(0)
+                .limit(len);
+
+        tempNativeBuffer = tempNativeBuffer.slice();
+
+        buffer.nativeBuffer.clear();
 
         logger.debug("Reading buffer '{}' from offset {} as bytes", buffer.getBufferName(), offset);
         return readBytes(offset, tempNativeBuffer);
@@ -376,7 +381,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                     buffer.clBuffer,
                     true,
                     offset * data.getSizeStruct(),
-                    tempNativeBuffer.rewind(),
+                    (ByteBuffer) tempNativeBuffer.rewind(),
                     null,
                     null
             );

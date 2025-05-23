@@ -163,7 +163,8 @@ public abstract class AbstractBuffer {
             initializeDataObject();
             registerWithContext();
 
-            if (this instanceof AdditionalLifecycle additionalLifecycle) {
+            if (this instanceof AdditionalLifecycle) {
+                AdditionalLifecycle additionalLifecycle = (AdditionalLifecycle) this;
                 try {
                     additionalLifecycle.additionalInit();
                 } catch (Exception e) {
@@ -272,7 +273,8 @@ public abstract class AbstractBuffer {
         if (initiated) {
             logger.info("Destroying buffer '{}'", bufferName);
 
-            if (this instanceof AdditionalLifecycle additionalLifecycle) {
+            if (this instanceof AdditionalLifecycle) {
+                AdditionalLifecycle additionalLifecycle = (AdditionalLifecycle) this;
                 try {
                     additionalLifecycle.additionalCleanup();
                 } catch (Exception e) {

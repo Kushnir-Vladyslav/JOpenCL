@@ -135,7 +135,8 @@ public abstract class AbstractGlobalBuffer
     }
 
     private void initializeBuffer() {
-        if (this instanceof Dynamical dynamical) {
+        if (this instanceof Dynamical) {
+            Dynamical dynamical = (Dynamical) this;
             capacity = (int)(capacity * dynamical.getCapacityMultiplier());
             if (capacity < dynamical.getMinCapacity()) {
                 capacity = dynamical.getMinCapacity();
@@ -144,7 +145,8 @@ public abstract class AbstractGlobalBuffer
         }
 
         if (copyHostBuffer) {
-            if (dataObject instanceof ConvertFromByteBuffer converter) {
+            if (dataObject instanceof ConvertFromByteBuffer) {
+                ConvertFromByteBuffer converter = (ConvertFromByteBuffer) this;
                 hostBuffer = converter.createArr(capacity);
                 logger.debug("Created host buffer copy for buffer '{}' with capacity {}",
                         getBufferName(), capacity);
