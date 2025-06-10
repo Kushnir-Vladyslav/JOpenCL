@@ -3,12 +3,8 @@ package com.jopencl.Event;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class EventSubscriber {
-    private final BlockingQueue<Event> subscriberQueue;
-
-    protected EventSubscriber() {
-        this.subscriberQueue = new LinkedBlockingQueue<>();
-    }
+public abstract class EventSubscriber {
+    protected final BlockingQueue<Event> subscriberQueue = new LinkedBlockingQueue<>();
 
     public void onEvent(Event event) {
         try {
@@ -18,6 +14,7 @@ public class EventSubscriber {
         }
     }
 
-
-
+    protected void clearQueue() {
+        subscriberQueue.clear();
+    }
 }

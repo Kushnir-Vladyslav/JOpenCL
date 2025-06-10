@@ -1,0 +1,88 @@
+package com.jopencl.Event.EventSubscribers;
+
+import com.jopencl.Event.Event;
+import com.jopencl.Event.EventsHandler;
+import com.jopencl.Event.EventSubscriber;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class BatchEventSubscriber extends EventSubscriber {
+    private final Thread dispatchThread;
+    private volatile boolean isRunning;
+
+    private final int batchSize;
+
+    protected Map<Class<? extends Event>, EventsHandler<?>> handlers = new ConcurrentHashMap<>();
+    protected Map<Class<? extends Event>, List<Event>> bathes = new ConcurrentHashMap<>();
+
+    public BatchEventSubscriber (int batchSize) {
+        if (batchSize <= 0) {
+            throw new RuntimeException("negative size");
+        }
+        this.batchSize = batchSize;
+
+        dispatchThread = new Thread(this::processEvents);
+
+        run();
+    }
+
+    public void run() {
+        if (!isRunning) {
+            isRunning = true;
+
+            dispatchThread.start();
+        }
+    }
+
+    private void processEvents () {
+        while (isRunning) {
+            try {
+                Event event = subscriberQueue.take();
+
+                if (handlers.containsKey(event.getClass())) {
+                    List<Event> batch = bathes.computeIfAbsent(event.getClass(), k -> new ArrayList<>());
+
+                    batch.add(event);
+
+                    if (batch.size() >= batchSize) {
+                        processBatch(event.getClass(), batch);
+                    }
+                }
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Event> void processBatch(Class<T> eventType, List<Event> batch) {
+        EventsHandler<Event> handler = (EventsHandler<Event>) handlers.get(eventType);
+        handler.handle(batch);
+
+        batch.clear();
+    }
+
+    public <T extends Event> void subscribe (Class<T> eventType, EventsHandler<T> handler) {
+        handlers.put(eventType, handler);
+    }
+
+    public <T extends Event> void unsubscribe (Class<T> eventType) {
+        handlers.remove(eventType);
+    }
+
+    public void shutdown() {
+        if (isRunning) {
+            isRunning = false;
+            dispatchThread.interrupt();
+
+            for (Map.Entry<Class<? extends Event>, List<Event>> event : bathes.entrySet()) {
+                processBatch(event.getKey(), event.getValue());
+            }
+        }
+    }
+}

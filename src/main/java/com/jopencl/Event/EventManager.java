@@ -19,6 +19,8 @@ public class EventManager {
         this.subscribers = new CopyOnWriteArrayList<>();
 
         this.dispatchThread = new Thread(this::dispatchEvents);
+
+        run();
     }
 
     public static EventManager getEventManager () {
@@ -26,10 +28,11 @@ public class EventManager {
     }
 
     public void run() {
-        this.isRunning = true;
+        if (!isRunning) {
+            this.isRunning = true;
 
-        this.dispatchThread.setName("EventBus-Dispatcher");
-        this.dispatchThread.start();
+            this.dispatchThread.start();
+        }
     }
 
 
@@ -69,7 +72,9 @@ public class EventManager {
     }
 
     public void shutdown() {
-        isRunning = false;
-        dispatchThread.interrupt();
+        if (isRunning) {
+            isRunning = false;
+            dispatchThread.interrupt();
+        }
     }
 }
