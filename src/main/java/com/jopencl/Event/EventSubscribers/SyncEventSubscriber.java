@@ -6,6 +6,24 @@ import com.jopencl.Event.EventProcessing;
 
 public class SyncEventSubscriber extends EventProcessing {
 
+    public SyncEventSubscriber (boolean autoRun) {
+        if (autoRun) {
+            run();
+        }
+    }
+
+    public SyncEventSubscriber () {
+        this(false);
+    }
+
+    @Override
+    public void run() {
+        if (!isRunning) {
+            isRunning = true;
+            subscribe();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public void processEvents () {
         Event event;
@@ -18,4 +36,11 @@ public class SyncEventSubscriber extends EventProcessing {
         }
     }
 
+    @Override
+    public void stop() {
+        if(isRunning) {
+            isRunning = false;
+            unsubscribe();
+        }
+    }
 }

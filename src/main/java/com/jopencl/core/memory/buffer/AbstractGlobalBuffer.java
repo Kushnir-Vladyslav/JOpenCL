@@ -293,6 +293,15 @@ public abstract class AbstractGlobalBuffer
         }
     }
 
+    /**
+     * Gets the current size of the buffer.
+     *
+     * @return the buffer size
+     */
+    public int getSize() {
+        return size;
+    }
+
     @Override
     public void destroy () {
         logger.debug("Destroying buffer '{}'", getBufferName());
