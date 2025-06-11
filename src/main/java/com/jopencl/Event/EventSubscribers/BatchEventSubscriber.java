@@ -11,14 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class BatchEventSubscriber extends EventSubscriber {
     private final Thread dispatchThread;
-    private volatile boolean isRunning;
-
     private final int batchSize;
 
     protected Map<Class<? extends Event>, EventsHandler<?>> handlers = new ConcurrentHashMap<>();
     protected Map<Class<? extends Event>, List<Event>> bathes = new ConcurrentHashMap<>();
 
-    public BatchEventSubscriber (int batchSize) {
+    public BatchEventSubscriber (int batchSize, boolean autoRun) {
         if (batchSize <= 0) {
             throw new RuntimeException("negative size");
         }
@@ -26,13 +24,20 @@ public class BatchEventSubscriber extends EventSubscriber {
 
         dispatchThread = new Thread(this::processEvents);
 
-        run();
+        if (autoRun) {
+            run();
+        }
     }
 
+    public BatchEventSubscriber(int batchSize) {
+        this(batchSize, true);
+    }
+
+    @Override
     public void run() {
         if (!isRunning) {
             isRunning = true;
-
+            subscribe();
             dispatchThread.start();
         }
     }
@@ -67,17 +72,21 @@ public class BatchEventSubscriber extends EventSubscriber {
         batch.clear();
     }
 
-    public <T extends Event> void subscribe (Class<T> eventType, EventsHandler<T> handler) {
+    public <T extends Event> void subscribeEvent (Class<T> eventType, EventsHandler<T> handler) {
         handlers.put(eventType, handler);
     }
 
-    public <T extends Event> void unsubscribe (Class<T> eventType) {
-        handlers.remove(eventType);
+    public <T extends Event> void unsubscribeEvent (Class<T> ... eventsType) {
+        for (Class<?> eventType : eventsType) {
+            handlers.remove(eventType);
+        }
     }
 
-    public void shutdown() {
+    @Override
+    public void stop() {
         if (isRunning) {
             isRunning = false;
+            unsubscribe();
             dispatchThread.interrupt();
 
             for (Map.Entry<Class<? extends Event>, List<Event>> event : bathes.entrySet()) {

@@ -6,17 +6,23 @@ import com.jopencl.Event.EventProcessing;
 
 public class AsyncEventSubscriber extends EventProcessing {
     private final Thread dispatchThread;
-    private volatile boolean isRunning;
 
-    public AsyncEventSubscriber () {
+    public AsyncEventSubscriber (boolean autoRun) {
         dispatchThread = new Thread(this::processEvents);
-        run();
+        if (autoRun) {
+            run();
+        }
     }
 
+    public AsyncEventSubscriber () {
+        this(false);
+    }
+
+    @Override
     public void run() {
         if (!isRunning) {
             isRunning = true;
-
+            subscribe();
             dispatchThread.start();
         }
     }
@@ -37,9 +43,11 @@ public class AsyncEventSubscriber extends EventProcessing {
         }
     }
 
-    public void shutdown() {
+    @Override
+    public void stop() {
         if (isRunning) {
             isRunning = false;
+            unsubscribe();
             dispatchThread.interrupt();
         }
     }

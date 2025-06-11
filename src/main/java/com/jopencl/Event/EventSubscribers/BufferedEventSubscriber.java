@@ -8,6 +8,24 @@ import java.util.*;
 public class BufferedEventSubscriber extends EventSubscriber {
     protected Set<Class<?>> eventFiler = new HashSet<>();
 
+    public BufferedEventSubscriber(boolean autoRun) {
+        if (autoRun) {
+            run();
+        }
+    }
+
+    public BufferedEventSubscriber() {
+        this(true);
+    }
+
+    @Override
+    public void run() {
+        if (!isRunning) {
+            isRunning = true;
+            subscribe();
+        }
+    }
+
     public <T extends Event> void addEventTypes (Class<T> ... eventTypes) {
         for (Class<T> event : eventTypes) {
             if (event != null) {
@@ -44,5 +62,13 @@ public class BufferedEventSubscriber extends EventSubscriber {
         }
 
         return events;
+    }
+
+    @Override
+    public void stop() {
+        if(isRunning) {
+            isRunning = false;
+            unsubscribe();
+        }
     }
 }
