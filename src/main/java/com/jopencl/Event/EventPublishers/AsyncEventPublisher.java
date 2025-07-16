@@ -16,11 +16,7 @@ public class AsyncEventPublisher extends EventPublisher {
 
     public void publish(Event event) {
         executor.submit(() -> {
-            try {
-                publishEvent(event);
-            } catch (Exception e) {
-                //log
-            }
+            publishEvent(event);
         });
     }
 

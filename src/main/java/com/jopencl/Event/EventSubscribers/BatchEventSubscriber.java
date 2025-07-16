@@ -8,9 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class BatchEventSubscriber extends EventSubscriber {
-    private Thread dispatchThread;
+    private final ExecutorService executor;
     private final int batchSize;
 
     protected Map<Class<? extends Event>, EventsHandler<?>> handlers = new ConcurrentHashMap<>();
@@ -21,6 +23,8 @@ public class BatchEventSubscriber extends EventSubscriber {
             throw new RuntimeException("negative size");
         }
         this.batchSize = batchSize;
+
+        executor = Executors.newFixedThreadPool(1);
 
         if (autoRun) {
             run();
@@ -34,11 +38,9 @@ public class BatchEventSubscriber extends EventSubscriber {
     @Override
     public void run() {
         if (!isRunning) {
-            dispatchThread = new Thread(this::processEvents);
-
             isRunning = true;
             subscribe();
-            dispatchThread.start();
+            executor.submit(this::processEvents);
         }
     }
 
@@ -87,7 +89,7 @@ public class BatchEventSubscriber extends EventSubscriber {
         if (isRunning) {
             isRunning = false;
             unsubscribe();
-            dispatchThread.interrupt();
+            executor.shutdown();
 
             for (Map.Entry<Class<? extends Event>, List<Event>> event : bathes.entrySet()) {
                 processBatch(event.getKey(), event.getValue());

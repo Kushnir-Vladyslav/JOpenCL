@@ -2,17 +2,17 @@ package com.jopencl.Event.EventSubscribers;
 
 import com.jopencl.Event.Event;
 import com.jopencl.Event.EventHandler;
-import com.jopencl.Event.EventProcessing;
+import com.jopencl.Event.ProcessingEventSubscriber;
 
-public class SyncEventSubscriber extends EventProcessing {
+public class SyncSubscriberEventSubscriber extends ProcessingEventSubscriber {
 
-    public SyncEventSubscriber (boolean autoRun) {
+    public SyncSubscriberEventSubscriber(boolean autoRun) {
         if (autoRun) {
             run();
         }
     }
 
-    public SyncEventSubscriber () {
+    public SyncSubscriberEventSubscriber() {
         this(false);
     }
 

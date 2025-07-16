@@ -2,10 +2,11 @@ package com.jopencl.Event;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 
 public abstract class EventSubscriber {
     protected static final EventManager eventManger;
-    protected final BlockingQueue<Event> subscriberQueue = new LinkedBlockingQueue<>();
+    protected final PriorityBlockingQueue<Event> subscriberQueue = new PriorityBlockingQueue<>(10, Event::priorityComparator);
 
     protected boolean isRunning = false;
 
@@ -20,11 +21,7 @@ public abstract class EventSubscriber {
     }
 
     public void onEvent(Event event) {
-        try {
-            subscriberQueue.put(event);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        subscriberQueue.put(event);
     }
 
     protected void clearQueue() {

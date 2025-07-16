@@ -1,9 +1,9 @@
 package com.jopencl.Event;
 
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
+import java.util.concurrent.PriorityBlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 public class EventManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(EventManager.class);
 
-    private final BlockingQueue<Event> eventQueue;
+    private final PriorityBlockingQueue<Event> eventQueue;
     private final List<EventSubscriber> subscribers;
     private final Thread dispatchThread;
     private volatile boolean isRunning;
@@ -39,7 +39,7 @@ public class EventManager {
      */
     private EventManager() {
         LOGGER.debug("Initializing EventManager");
-        this.eventQueue = new LinkedBlockingQueue<>();
+        this.eventQueue = new PriorityBlockingQueue<>(10, Event::priorityComparator);
         this.subscribers = new CopyOnWriteArrayList<>();
 
         this.dispatchThread = new Thread(this::dispatchEvents);
@@ -74,7 +74,6 @@ public class EventManager {
      *
      * @param event the event to publish
      * @throws IllegalArgumentException if the event is null
-     * @throws RuntimeException if the thread is interrupted while publishing
      */
     public void publish(Event event) {
         if (event == null) {
@@ -82,14 +81,8 @@ public class EventManager {
             throw new IllegalArgumentException("Event cannot be null");
         }
 
-        try {
-            LOGGER.debug("Publishing event: {}", event);
-            eventQueue.put(event);
-        } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            LOGGER.error("Failed to publish event: {}", event, e);
-            throw new RuntimeException("Failed to publish event", e);
-        }
+        LOGGER.debug("Publishing event: {}", event);
+        eventQueue.put(event);
     }
 
     /**

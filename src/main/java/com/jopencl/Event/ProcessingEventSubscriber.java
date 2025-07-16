@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 
-public abstract class EventProcessing extends EventSubscriber {
+public abstract class ProcessingEventSubscriber extends EventSubscriber {
     protected Map<Class<? extends Event>, EventHandler<?>> handlers = new ConcurrentHashMap<>();
 
     public <T extends Event> void subscribeEvent(Class<T> eventType, EventHandler<T> handler) {

@@ -2,29 +2,32 @@ package com.jopencl.Event.EventSubscribers;
 
 import com.jopencl.Event.Event;
 import com.jopencl.Event.EventHandler;
-import com.jopencl.Event.EventProcessing;
+import com.jopencl.Event.ProcessingEventSubscriber;
 
-public class AsyncEventSubscriber extends EventProcessing {
-    private Thread dispatchThread;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-    public AsyncEventSubscriber (boolean autoRun) {
+public class AsyncSubscriberEventSubscriber extends ProcessingEventSubscriber {
+    private final ExecutorService executor;
+
+    public AsyncSubscriberEventSubscriber(boolean autoRun) {
+        executor = Executors.newFixedThreadPool(1);
+
         if (autoRun) {
             run();
         }
     }
 
-    public AsyncEventSubscriber () {
+    public AsyncSubscriberEventSubscriber() {
         this(false);
     }
 
     @Override
     public void run() {
         if (!isRunning) {
-            dispatchThread = new Thread(this::processEvents);
-
             isRunning = true;
             subscribe();
-            dispatchThread.start();
+            executor.submit(this::processEvents);
         }
     }
 
@@ -49,7 +52,7 @@ public class AsyncEventSubscriber extends EventProcessing {
         if (isRunning) {
             isRunning = false;
             unsubscribe();
-            dispatchThread.interrupt();
+            executor.shutdown();
         }
     }
 }
