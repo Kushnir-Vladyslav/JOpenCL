@@ -5,16 +5,22 @@ import com.jopencl.Event.EventPublisher;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class BatchEventPublisher extends EventPublisher {
     private final int batchSize;
     private List<Event> batch = new ArrayList<>();
+
+    private final ExecutorService executor;
 
     public BatchEventPublisher (int batchSize) {
         if (batchSize <= 0) {
             throw new RuntimeException("negative size");
         }
         this.batchSize = batchSize;
+
+        executor = Executors.newFixedThreadPool(1);
     }
 
     public void publish (Event event) {
@@ -28,7 +34,7 @@ public class BatchEventPublisher extends EventPublisher {
         List<Event> fullBatch = batch;
         batch = new ArrayList<>();
 
-        Thread thread = new Thread( () -> {
+        executor.submit( () -> {
            for (Event event : fullBatch) {
                try {
                    publishEvent(event);
@@ -37,7 +43,10 @@ public class BatchEventPublisher extends EventPublisher {
                }
            }
         });
-        thread.start();
     }
 
+    @Override
+    public void shutdown() {
+        executor.shutdown();
+    }
 }

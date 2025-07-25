@@ -7,4 +7,7 @@ public class SyncEventPublisher extends EventPublisher {
     public void publish(Event event) {
         publishEvent(event);
     }
+
+    @Override
+    public void shutdown () {}
 }

@@ -1,9 +1,7 @@
 package com.jopencl.Event;
 
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 import java.util.List;
-import java.util.concurrent.PriorityBlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +21,7 @@ public class EventManager {
 
     private final PriorityBlockingQueue<Event> eventQueue;
     private final List<EventSubscriber> subscribers;
-    private final Thread dispatchThread;
+    private final ExecutorService executor;
     private volatile boolean isRunning;
 
     /**
@@ -42,7 +40,7 @@ public class EventManager {
         this.eventQueue = new PriorityBlockingQueue<>(10, Event::priorityComparator);
         this.subscribers = new CopyOnWriteArrayList<>();
 
-        this.dispatchThread = new Thread(this::dispatchEvents);
+        executor = Executors.newFixedThreadPool(1);
 
         run();
     }
@@ -59,12 +57,20 @@ public class EventManager {
     /**
      * Starts the event dispatch thread if it's not already running.
      * Thread-safe method that ensures the dispatch thread is started only once.
+     *
+     * @throws IllegalArgumentException if the EventManager is disabled
      */
     public synchronized void run() {
         if (!isRunning) {
             LOGGER.info("Starting EventManager dispatch thread");
             this.isRunning = true;
-            this.dispatchThread.start();
+            this.eventQueue.clear();
+            if (!executor.isShutdown()) {
+                this.executor.submit(this::dispatchEvents);
+            } else {
+                LOGGER.error("Attempted to run the disabled EventManager");
+                throw new IllegalStateException("EventManager was already disabled.");
+            }
         }
     }
 
@@ -144,6 +150,19 @@ public class EventManager {
     }
 
     /**
+     * Stops the event dispatch thread if it is not already stopped.
+     * After stopping, EventManager can be restarted.
+     * Can be called multiple times safely.
+     */
+    public void stop() {
+        if (isRunning) {
+            LOGGER.info("Stopping EventManager");
+            isRunning = false;
+            eventQueue.clear();
+        }
+    }
+
+    /**
      * Shuts down the EventManager by stopping the dispatch thread.
      * Can be called multiple times safely.
      */
@@ -151,7 +170,7 @@ public class EventManager {
         if (isRunning) {
             LOGGER.info("Shutting down EventManager");
             isRunning = false;
-            dispatchThread.interrupt();
+            executor.shutdown();
             eventQueue.clear();
         }
     }

@@ -9,7 +9,6 @@ import java.util.concurrent.Executors;
 public class AsyncEventPublisher extends EventPublisher {
     private final ExecutorService executor;
 
-
     public AsyncEventPublisher () {
         executor = Executors.newFixedThreadPool(1);
     }
@@ -20,6 +19,7 @@ public class AsyncEventPublisher extends EventPublisher {
         });
     }
 
+    @Override
     public void shutdown() {
         executor.shutdown();
     }

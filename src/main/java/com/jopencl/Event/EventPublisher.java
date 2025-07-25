@@ -9,5 +9,7 @@ public abstract class EventPublisher {
     protected void publishEvent(Event event) {
         eventManager.publish(event);
     }
+
+    public abstract void shutdown();
 }
 

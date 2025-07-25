@@ -21,4 +21,7 @@ public class ConditionalEventPublisher extends EventPublisher {
             publishEvent(event);
         }
     }
+
+    @Override
+    public void shutdown() {}
 }
