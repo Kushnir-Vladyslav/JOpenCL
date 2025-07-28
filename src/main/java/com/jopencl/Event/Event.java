@@ -37,7 +37,7 @@ public abstract class Event <T> {
                 '}';
     }
 
-    static public int priorityComparator (Event event1, Event event2) {
+    static public int priorityComparator (Event<?> event1, Event<?> event2) {
         EventPriority priority1 = event1.getPriority();
         EventPriority priority2 = event2.getPriority();
 
