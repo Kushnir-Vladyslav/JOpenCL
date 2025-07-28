@@ -1,8 +1,9 @@
 package com.jopencl.Event.EventSubscribers;
 
 import com.jopencl.Event.Event;
-import com.jopencl.Event.EventsHandler;
-import com.jopencl.Event.EventSubscriber;
+import com.jopencl.Event.Events.ListEvents;
+import com.jopencl.Event.ProcessingListEventErrorSubscriber;
+import com.jopencl.Event.Status;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,13 +11,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-public class BatchEventSubscriber extends EventSubscriber {
+public class BatchEventSubscriber extends ProcessingListEventErrorSubscriber {
     private final ExecutorService executor;
+    private volatile Future<?> dispatchTask;
     private final int batchSize;
-
-    protected Map<Class<? extends Event>, EventsHandler<?>> handlers = new ConcurrentHashMap<>();
-    protected Map<Class<? extends Event>, List<Event>> bathes = new ConcurrentHashMap<>();
+    
+    protected Map<Class<? extends Event<?>>, List<Event<?>>> batches = new ConcurrentHashMap<>();
 
     public BatchEventSubscriber (int batchSize, boolean autoRun) {
         if (batchSize <= 0) {
@@ -24,41 +26,47 @@ public class BatchEventSubscriber extends EventSubscriber {
         }
         this.batchSize = batchSize;
 
-        executor = Executors.newFixedThreadPool(1);
+        executor = Executors.newFixedThreadPool(2);
 
         if (autoRun) {
             run();
         }
     }
 
-    public BatchEventSubscriber(int batchSize) {
-        this(batchSize, true);
+    public BatchEventSubscriber (int batchSize) {
+        this(batchSize, false);
     }
+    
 
     @Override
     public void run() {
-        if (!isRunning) {
-            isRunning = true;
+        if (status == Status.CREATED || status == Status.PAUSED || status == Status.STOPPED) {
+            status = Status.RUNNING;
             subscribe();
-            executor.submit(this::processEvents);
+            dispatchTask = executor.submit(this::processEvents);
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BatchEventSubscriber was already disabled.");
         }
     }
 
     private void processEvents () {
-        while (isRunning) {
+        while (status == Status.RUNNING) {
             try {
-                Event event = subscriberQueue.take();
+                Event<?> event = subscriberQueue.take();
 
-                if (handlers.containsKey(event.getClass())) {
-                    List<Event> batch = bathes.computeIfAbsent(event.getClass(), k -> new ArrayList<>());
+                @SuppressWarnings("unchecked")
+                Class<Event<?>> eventType = (Class<Event<?>>) event.getClass();
+
+                if (handlers.containsKey(eventType)) {
+                    List<Event<?>> batch = batches.computeIfAbsent(eventType, k -> new ArrayList<>());
 
                     batch.add(event);
 
                     if (batch.size() >= batchSize) {
-                        processBatch(event.getClass(), batch);
+                        batch = batches.remove(eventType);
+                        processEvent(new ListEvents<>(eventType, batch));
                     }
                 }
-
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -66,34 +74,46 @@ public class BatchEventSubscriber extends EventSubscriber {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends Event> void processBatch(Class<T> eventType, List<Event> batch) {
-        EventsHandler<Event> handler = (EventsHandler<Event>) handlers.get(eventType);
-        handler.handle(batch);
-
-        batch.clear();
+    public void flush() {
+        if (status != Status.SHUTDOWN) {
+            for (Class<? extends Event<?>> eventType : batches.keySet()) {
+                List listEvent = batches.remove(eventType);
+                executor.submit(() -> processEvent(new ListEvents<>(eventType, listEvent)));
+            }
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BatchEventSubscriber was already disabled.");
+        }
     }
 
-    public <T extends Event> void subscribeEvent (Class<T> eventType, EventsHandler<T> handler) {
-        handlers.put(eventType, handler);
-    }
-
-    public <T extends Event> void unsubscribeEvent (Class<T> ... eventsType) {
-        for (Class<?> eventType : eventsType) {
-            handlers.remove(eventType);
+    @Override
+    public void pause() {
+        if (status == Status.RUNNING) {
+            status = Status.PAUSED;
+            unsubscribe();
+            dispatchTask.cancel(true);
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BatchEventSubscriber was already disabled.");
         }
     }
 
     @Override
     public void stop() {
-        if (isRunning) {
-            isRunning = false;
-            unsubscribe();
-            executor.shutdown();
+        if (status == Status.RUNNING || status == Status.PAUSED) {
+            dispatchTask.cancel(true);
+            super.stop();
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BatchEventSubscriber was already disabled.");
+        }
+    }
 
-            for (Map.Entry<Class<? extends Event>, List<Event>> event : bathes.entrySet()) {
-                processBatch(event.getKey(), event.getValue());
-            }
+    @Override
+    public void shutdown() {
+        if (status != Status.SHUTDOWN) {
+            status = Status.SHUTDOWN;
+            unsubscribe();
+            executor.shutdownNow();
+        } else {
+            throw new IllegalStateException("BatchEventSubscriber was already disabled.");
         }
     }
 }

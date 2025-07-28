@@ -19,10 +19,11 @@ import org.slf4j.LoggerFactory;
 public class EventManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(EventManager.class);
 
-    private final PriorityBlockingQueue<Event> eventQueue;
+    private final PriorityBlockingQueue<Event<?>> eventQueue;
     private final List<EventSubscriber> subscribers;
     private final ExecutorService executor;
-    private volatile boolean isRunning;
+    private volatile Future<?> dispatchTask;
+    private volatile Status status = Status.CREATED;
 
     /**
      * Holder class for lazy initialization of EventManager singleton.
@@ -61,16 +62,18 @@ public class EventManager {
      * @throws IllegalArgumentException if the EventManager is disabled
      */
     public synchronized void run() {
-        if (!isRunning) {
+        if (status == Status.CREATED || status == Status.PAUSED || status == Status.STOPPED) {
             LOGGER.info("Starting EventManager dispatch thread");
-            this.isRunning = true;
-            this.eventQueue.clear();
+            this.status = Status.RUNNING;
             if (!executor.isShutdown()) {
-                this.executor.submit(this::dispatchEvents);
+                this.dispatchTask = this.executor.submit(this::dispatchEvents);
             } else {
                 LOGGER.error("Attempted to run the disabled EventManager");
                 throw new IllegalStateException("EventManager was already disabled.");
             }
+        } else if (status == Status.SHUTDOWN) {
+            LOGGER.error("Attempted to run the disabled EventManager");
+            throw new IllegalStateException("EventManager was already disabled.");
         }
     }
 
@@ -81,7 +84,7 @@ public class EventManager {
      * @param event the event to publish
      * @throws IllegalArgumentException if the event is null
      */
-    public void publish(Event event) {
+    public void publish(Event<?> event) {
         if (event == null) {
             LOGGER.error("Attempted to publish null event");
             throw new IllegalArgumentException("Event cannot be null");
@@ -129,9 +132,9 @@ public class EventManager {
      */
     private void dispatchEvents() {
         LOGGER.info("Event dispatch thread started");
-        while (isRunning) {
+        while (status == Status.RUNNING) {
             try {
-                Event event = eventQueue.take();
+                Event<?> event = eventQueue.take();
                 for (EventSubscriber subscriber : subscribers) {
                     try {
                         subscriber.onEvent(event);
@@ -149,16 +152,31 @@ public class EventManager {
         LOGGER.info("Event dispatch thread stopped");
     }
 
+    public void pause() {
+        if (status == Status.RUNNING) {
+            LOGGER.info("Stopping EventManager");
+            status = Status.PAUSED;
+            dispatchTask.cancel(true);
+        } else if (status == Status.SHUTDOWN) {
+            LOGGER.error("Attempted to pause the disabled EventManager");
+            throw new IllegalStateException("EventManager was already disabled.");
+        }
+    }
+
     /**
      * Stops the event dispatch thread if it is not already stopped.
      * After stopping, EventManager can be restarted.
      * Can be called multiple times safely.
      */
     public void stop() {
-        if (isRunning) {
+        if (status == Status.RUNNING || status == Status.PAUSED) {
             LOGGER.info("Stopping EventManager");
-            isRunning = false;
+            status = Status.STOPPED;
+            dispatchTask.cancel(true);
             eventQueue.clear();
+        } else if (status == Status.SHUTDOWN) {
+            LOGGER.error("Attempted to stop the disabled EventManager");
+            throw new IllegalStateException("EventManager was already disabled.");
         }
     }
 
@@ -167,11 +185,14 @@ public class EventManager {
      * Can be called multiple times safely.
      */
     public void shutdown() {
-        if (isRunning) {
+        if (status != Status.SHUTDOWN) {
             LOGGER.info("Shutting down EventManager");
-            isRunning = false;
-            executor.shutdown();
+            status = Status.SHUTDOWN;
+            executor.shutdownNow();
             eventQueue.clear();
+        } else {
+                LOGGER.error("Attempted to shutdown the disabled EventManager");
+            throw new IllegalStateException("EventManager was already disabled.");
         }
     }
 
@@ -193,5 +214,9 @@ public class EventManager {
      */
     public int getQueueSize() {
         return eventQueue.size();
+    }
+
+    public Status getStatus() {
+        return status;
     }
 }

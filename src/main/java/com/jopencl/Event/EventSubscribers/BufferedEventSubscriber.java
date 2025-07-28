@@ -2,11 +2,12 @@ package com.jopencl.Event.EventSubscribers;
 
 import com.jopencl.Event.Event;
 import com.jopencl.Event.EventSubscriber;
+import com.jopencl.Event.Status;
 
 import java.util.*;
 
 public class BufferedEventSubscriber extends EventSubscriber {
-    protected Set<Class<?>> eventFiler = new HashSet<>();
+    protected Set<Class<?>> eventFilter = new HashSet<>();
 
     public BufferedEventSubscriber(boolean autoRun) {
         if (autoRun) {
@@ -20,43 +21,51 @@ public class BufferedEventSubscriber extends EventSubscriber {
 
     @Override
     public void run() {
-        if (!isRunning) {
-            isRunning = true;
+        if (status == Status.CREATED || status == Status.PAUSED || status == Status.STOPPED) {
+            status = Status.RUNNING;
             subscribe();
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BufferedEventSubscriber was already disabled.");
         }
     }
 
-    public <T extends Event> void addEventTypes (Class<T> ... eventTypes) {
-        for (Class<T> event : eventTypes) {
+    public void subscribeEvent (Class<? extends Event<?>> ... eventTypes) {
+        if (eventTypes == null) {
+            return;
+        }
+        for (Class<? extends Event<?>> event : eventTypes) {
             if (event != null) {
-                eventFiler.add(event);
+                eventFilter.add(event);
             }
         }
     }
 
-    public <T extends Event> void removeEventTypes (Class<T> ... eventTypes) {
-        for (Class<T> event : eventTypes) {
+    public void unsubscribeEvent (Class<? extends Event<?>> ... eventTypes) {
+        if (eventTypes == null) {
+            return;
+        }
+        for (Class<? extends Event<?>> event : eventTypes) {
             if (event != null) {
-                eventFiler.remove(event);
+                eventFilter.remove(event);
             }
         }
     }
 
-    public List<Event> collectAllEvents () {
-        List<Event> events = new ArrayList<>();
+    public List<Event<?>> collectAllEvents () {
+        List<Event<?>> events = new ArrayList<>();
 
         subscriberQueue.drainTo(events);
 
         return events;
     }
 
-    public List<Event> collectEvents () {
-        List<Event> events = new ArrayList<>();
+    public List<Event<?>> collectEvents () {
+        List<Event<?>> events = new ArrayList<>();
 
-        Event event;
+        Event<?> event;
 
         while ((event = subscriberQueue.poll()) != null) {
-            if (eventFiler.contains(event.getClass())) {
+            if (eventFilter.contains(event.getClass())) {
                 events.add(event);
             }
         }
@@ -65,10 +74,31 @@ public class BufferedEventSubscriber extends EventSubscriber {
     }
 
     @Override
-    public void stop() {
-        if(isRunning) {
-            isRunning = false;
+    public void pause() {
+        if (status == Status.RUNNING) {
+            status = Status.PAUSED;
             unsubscribe();
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BufferedEventSubscriber was already disabled.");
+        }
+    }
+
+    @Override
+    public void stop() {
+        if (status == Status.RUNNING || status == Status.PAUSED) {
+            super.stop();
+        } else if (status == Status.SHUTDOWN) {
+            throw new IllegalStateException("BufferedEventSubscriber was already disabled.");
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        if(status != Status.SHUTDOWN) {
+            status = Status.SHUTDOWN;
+            unsubscribe();
+        } else {
+            throw new IllegalStateException("BufferedEventSubscriber was already disabled.");
         }
     }
 }

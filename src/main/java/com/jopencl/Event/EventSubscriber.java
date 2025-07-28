@@ -1,14 +1,12 @@
 package com.jopencl.Event;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 public abstract class EventSubscriber {
     protected static final EventManager eventManger;
-    protected final PriorityBlockingQueue<Event> subscriberQueue = new PriorityBlockingQueue<>(10, Event::priorityComparator);
+    protected final PriorityBlockingQueue<Event<?>> subscriberQueue = new PriorityBlockingQueue<>(10, Event::priorityComparator);
 
-    protected boolean isRunning = false;
+    protected volatile Status status = Status.CREATED;
 
     static {
         eventManger = EventManager.getInstance();
@@ -20,7 +18,7 @@ public abstract class EventSubscriber {
         eventManger.subscribe(this);
     }
 
-    public void onEvent(Event event) {
+    public void onEvent(Event<?> event) {
         subscriberQueue.put(event);
     }
 
@@ -28,7 +26,19 @@ public abstract class EventSubscriber {
         subscriberQueue.clear();
     }
 
-    public abstract void stop();
+    public Status getStatus () {
+        return status;
+    }
+
+    public abstract void pause();
+
+    public void stop() {
+        subscriberQueue.clear();
+        unsubscribe();
+        status = Status.STOPPED;
+    }
+
+    public abstract void shutdown();
 
     protected void unsubscribe(){
         eventManger.unsubscribe(this);

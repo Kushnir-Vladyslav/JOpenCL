@@ -1,6 +1,6 @@
 package com.jopencl.Event;
 
 @FunctionalInterface
-public interface EventHandler <T extends Event> {
+public interface BaseEventHandler <T extends Event<?>>{
     void handle(T event);
 }
