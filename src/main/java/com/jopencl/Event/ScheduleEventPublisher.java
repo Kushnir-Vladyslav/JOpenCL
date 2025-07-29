@@ -9,13 +9,10 @@ public abstract class ScheduleEventPublisher extends EventPublisher {
 
     @Override
     public void shutdown () {
-        if(status != Status.SHUTDOWN) {
-            status = Status.SHUTDOWN;
-            if (scheduler != null) {
-                scheduler.shutdownNow();
-            }
-        } else {
-            throw new IllegalStateException(this.getClass().getSimpleName() + " was already disabled.");
+        checkNotShutdown();
+        if (scheduler != null) {
+            scheduler.shutdownNow();
         }
+        status = Status.SHUTDOWN;
     }
 }

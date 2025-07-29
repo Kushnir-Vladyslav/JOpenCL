@@ -30,7 +30,6 @@ public class SyncEventPublisherTest {
         subscriber = new SyncSingleEventSubscriber();
     }
 
-
     @Test
     void testPublisherInitialStatus() {
         assertEquals(Status.RUNNING, publisher.getStatus());

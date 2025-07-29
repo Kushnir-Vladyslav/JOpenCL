@@ -7,6 +7,9 @@ import java.util.concurrent.*;
 
 public class TimeoutEventPublisher extends ExecuteEventPublisher {
     public TimeoutEventPublisher (TimeUnit timeUnit) {
+        if (timeUnit == null) {
+            throw new IllegalArgumentException("TimeUnit cannot be null");
+        }
         executor = Executors.newFixedThreadPool(1);
         this.timeUnit = timeUnit;
     }
@@ -15,7 +18,19 @@ public class TimeoutEventPublisher extends ExecuteEventPublisher {
         this(TimeUnit.MILLISECONDS);
     }
 
-    public void publish(Event event, long timeout, TimeUnit timeUnit) {
+    public void publish(Event<?> event, long timeout, TimeUnit timeUnit) {
+        if (event == null) {
+            throw new IllegalArgumentException("Event cannot be null");
+        }
+        if (timeout < 0) {
+            throw new IllegalArgumentException("Timeout cannot be negative");
+        }
+        if (timeUnit == null) {
+            throw new IllegalArgumentException("TimeUnit cannot be null");
+        }
+
+        checkNotShutdown();
+
         Future<?> future = executor.submit(() -> publishEvent(event));
         try {
             future.get(timeout, timeUnit);
@@ -28,7 +43,7 @@ public class TimeoutEventPublisher extends ExecuteEventPublisher {
         }
     }
 
-    public void publish(Event event, long timeout) {
+    public void publish(Event<?> event, long timeout) {
         publish(event, timeout, timeUnit);
     }
 }

@@ -17,17 +17,14 @@ public class AsyncEventPublisher extends ExecuteEventPublisher {
         if (event == null) {
             throw new IllegalArgumentException("Event cannot be null");
         }
-        if(status != Status.SHUTDOWN) {
-            executor.submit(() -> {
-                try {
-                    publishEvent(event);
-                } catch (Exception e) {
-                    //log
-                }
+        checkNotShutdown();
+        executor.submit(() -> {
+            try {
+                publishEvent(event);
+            } catch (Exception e) {
+                //log
+            }
 
-            });
-        } else  {
-            throw new IllegalStateException("AsyncEventPublisher was already disabled.");
-        }
+        });
     }
 }

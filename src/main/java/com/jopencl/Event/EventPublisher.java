@@ -13,6 +13,13 @@ public abstract class EventPublisher {
         return status;
     }
 
+    protected void checkNotShutdown () {
+        if (status == Status.SHUTDOWN) {
+            //log
+            throw new IllegalStateException(this.getClass().getSimpleName() + " was already disabled.");
+        }
+    }
+
     public abstract void shutdown();
 }
 

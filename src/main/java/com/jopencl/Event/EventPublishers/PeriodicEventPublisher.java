@@ -2,17 +2,23 @@ package com.jopencl.Event.EventPublishers;
 
 import com.jopencl.Event.Event;
 import com.jopencl.Event.ScheduleEventPublisher;
+import com.jopencl.Event.Status;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class PeriodicEventPublisher extends ScheduleEventPublisher {
-    private Map<String, ScheduledFuture<?>> scheduledTasks;
+    private final Map<String, ScheduledFuture<?>> scheduledTasks;
 
     public PeriodicEventPublisher (TimeUnit timeUnit) {
+        if (timeUnit == null) {
+            throw new IllegalArgumentException("TimeUnit cannot be null");
+        }
         scheduler = Executors.newScheduledThreadPool(1);
+        scheduledTasks = new HashMap<>();
         this.timeUnit = timeUnit;
     }
 
@@ -20,7 +26,22 @@ public class PeriodicEventPublisher extends ScheduleEventPublisher {
         this(TimeUnit.MILLISECONDS);
     }
 
-    public void publish(Event event, String identifier, long period, TimeUnit timeUnit) {
+    public ScheduledFuture<?> publish(Event<?> event, String identifier, long period, TimeUnit timeUnit) {
+        if (event == null) {
+            throw new IllegalArgumentException("Event cannot be null");
+        }
+        if (identifier == null) {
+            throw new IllegalArgumentException("Identifier cannot be null");
+        }
+        if (period < 0) {
+            throw new IllegalArgumentException("Period cannot be negative");
+        }
+        if (timeUnit == null) {
+            throw new IllegalArgumentException("TimeUnit cannot be null");
+        }
+
+        checkNotShutdown();
+
         ScheduledFuture<?> task = scheduledTasks.get(identifier);
         if (task != null) {
             //log
@@ -36,14 +57,21 @@ public class PeriodicEventPublisher extends ScheduleEventPublisher {
         }, 0, period, timeUnit);
 
         scheduledTasks.put(identifier, task);
+        return task;
     }
 
-    public void publish(Event event, String identifier, long period) {
-        publish(event, identifier, period, timeUnit);
+    public ScheduledFuture<?> publish(Event<?> event, String identifier, long period) {
+        return publish(event, identifier, period, timeUnit);
     }
 
-    public void cancel (Event event) {
-        ScheduledFuture<?> task = scheduledTasks.remove(event);
+    public void cancel (String identifier) {
+        checkNotShutdown();
+
+        if (identifier == null) {
+            throw new IllegalArgumentException("Identifier cannot be null");
+        }
+
+        ScheduledFuture<?> task = scheduledTasks.remove(identifier);
         if (task != null) {
             task.cancel(false);
         }
@@ -51,9 +79,11 @@ public class PeriodicEventPublisher extends ScheduleEventPublisher {
 
     @Override
     public void shutdown () {
+        checkNotShutdown();
         for (ScheduledFuture<?> task : scheduledTasks.values()) {
             task.cancel(false);
         }
+        scheduledTasks.clear();
         super.shutdown();
     }
 }
