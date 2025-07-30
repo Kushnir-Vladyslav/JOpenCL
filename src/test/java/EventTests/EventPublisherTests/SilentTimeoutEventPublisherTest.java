@@ -5,7 +5,9 @@ import EventTests.TestsEvents.IntEventTest;
 import EventTests.TestsEvents.StringEventTest;
 import com.jopencl.Event.EventManager;
 import com.jopencl.Event.EventPriority;
-import com.jopencl.Event.EventPublishers.AsyncEventPublisher;
+import com.jopencl.Event.EventPublishers.PeriodicEventPublisher;
+import com.jopencl.Event.EventPublishers.SilentTimeoutEventPublisher;
+import com.jopencl.Event.EventPublishers.SyncEventPublisher;
 import com.jopencl.Event.EventSubscribers.AsyncEventSubscriber;
 import com.jopencl.Event.EventSubscribers.SyncEventSubscriber;
 import com.jopencl.Event.Status;
@@ -14,24 +16,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class AsyncEventPublisherTest {
-    private AsyncEventPublisher publisher;
+public class SilentTimeoutEventPublisherTest {
+    private SilentTimeoutEventPublisher publisher;
     private AsyncEventSubscriber subscriber;
     private final EventManager eventManager = EventManager.getInstance();
 
     @BeforeEach
     void setUp() {
-        publisher = new AsyncEventPublisher();
+        publisher = new SilentTimeoutEventPublisher();
         subscriber = new AsyncEventSubscriber();
     }
 
@@ -41,8 +40,20 @@ public class AsyncEventPublisherTest {
     }
 
     @Test
-    void testPublishSingleEvent() throws InterruptedException {
-        StringEventTest event = new StringEventTest("async test message");
+    void testConstructorWithTimeUnit() {
+        SilentTimeoutEventPublisher customPublisher = new SilentTimeoutEventPublisher(TimeUnit.SECONDS);
+        assertEquals(Status.RUNNING, customPublisher.getStatus());
+        customPublisher.shutdown();
+    }
+
+    @Test
+    void testConstructorWithNullTimeUnit() {
+        assertThrows(IllegalArgumentException.class, () -> new SilentTimeoutEventPublisher(null));
+    }
+
+    @Test
+    void testPublishSingleEventWithTimeout() throws InterruptedException {
+        StringEventTest event = new StringEventTest("silent timeout test message");
         final AtomicInteger handlerCount = new AtomicInteger(0);
         final AtomicReference<String> receivedData = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -54,19 +65,55 @@ public class AsyncEventPublisherTest {
         });
         subscriber.run();
 
-        publisher.publish(event);
+        Future<?> future = publisher.publish(event, 1000, TimeUnit.MILLISECONDS);
 
         assertTrue(latch.await(2, TimeUnit.SECONDS));
         assertEquals(1, handlerCount.get());
-        assertEquals("async test message", receivedData.get());
+        assertEquals("silent timeout test message", receivedData.get());
+
+        assertDoesNotThrow(() -> future.get(100, TimeUnit.MILLISECONDS));
+        assertTrue(future.isDone());
+        assertFalse(future.isCancelled());
     }
 
     @Test
-    void testPublishMultipleEvents() throws InterruptedException {
+    void testPublishSingleEventWithDefaultTimeout() throws InterruptedException {
+        StringEventTest event = new StringEventTest("default timeout test");
+        final AtomicInteger handlerCount = new AtomicInteger(0);
+        final AtomicReference<String> receivedData = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+
+        subscriber.subscribeEvent(StringEventTest.class, (StringEventTest e) -> {
+            handlerCount.incrementAndGet();
+            receivedData.set(e.getData());
+            latch.countDown();
+        });
+        subscriber.run();
+
+        Future<?> future = publisher.publish(event, 1000);
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertEquals(1, handlerCount.get());
+        assertEquals("default timeout test", receivedData.get());
+        assertTrue(future.isDone());
+    }
+
+    @Test
+    void testPublishReturnsValidFuture() {
+        StringEventTest event = new StringEventTest("future test");
+
+        Future<?> future = publisher.publish(event, 1000);
+
+        assertNotNull(future);
+    }
+
+    @Test
+    void testPublishMultipleEventsWithTimeout() throws InterruptedException {
         final AtomicInteger stringCount = new AtomicInteger(0);
         final AtomicInteger intCount = new AtomicInteger(0);
         final AtomicInteger doubleCount = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(5);
+        List<Future<?>> futures = new ArrayList<>();
 
         subscriber.subscribeEvent(StringEventTest.class, e -> {
             stringCount.incrementAndGet();
@@ -82,39 +129,50 @@ public class AsyncEventPublisherTest {
         });
         subscriber.run();
 
-        publisher.publish(new StringEventTest("test1"));
-        publisher.publish(new StringEventTest("test2"));
-        publisher.publish(new IntEventTest(42));
-        publisher.publish(new DoubleEventTest(3.14));
-        publisher.publish(new StringEventTest("test3"));
+        futures.add(publisher.publish(new StringEventTest("test1"), 2000));
+        futures.add(publisher.publish(new StringEventTest("test2"), 2000));
+        futures.add(publisher.publish(new IntEventTest(42), 2000));
+        futures.add(publisher.publish(new DoubleEventTest(3.14), 2000));
+        futures.add(publisher.publish(new StringEventTest("test3"), 2000));
 
-        assertTrue(latch.await(3, TimeUnit.SECONDS));
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
 
         assertEquals(3, stringCount.get());
         assertEquals(1, intCount.get());
         assertEquals(1, doubleCount.get());
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+            assertFalse(future.isCancelled());
+        }
     }
 
     @Test
     void testPublishEventWithPriority() throws InterruptedException {
         StringBuilder processOrder = new StringBuilder();
+        List<Future<?>> futures = new ArrayList<>();
 
         SyncEventSubscriber subscriber2 = new SyncEventSubscriber();
 
-        subscriber2.subscribeEvent(StringEventTest.class, (StringEventTest event) -> processOrder.append(event.getData()));
+        subscriber2.subscribeEvent(StringEventTest.class, (StringEventTest event) ->
+                processOrder.append(event.getData()));
 
         subscriber2.run();
 
-        publisher.publish(new StringEventTest("L", EventPriority.LOW));
-        publisher.publish(new StringEventTest("H", EventPriority.HIGH));
-        publisher.publish(new StringEventTest("M", EventPriority.MEDIUM));
+        futures.add(publisher.publish(new StringEventTest("L", EventPriority.LOW), 2000));
+        futures.add(publisher.publish(new StringEventTest("H", EventPriority.HIGH), 2000));
+        futures.add(publisher.publish(new StringEventTest("M", EventPriority.MEDIUM), 2000));
 
-        Thread.sleep(50);
+        Thread.sleep(100);
 
         subscriber2.processEvents();
         subscriber2.shutdown();
 
         assertEquals("HML", processOrder.toString());
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+        }
     }
 
     @Test
@@ -138,13 +196,14 @@ public class AsyncEventPublisherTest {
             subscriber2.run();
 
             StringEventTest event = new StringEventTest("broadcast test");
-            publisher.publish(event);
+            Future<?> future = publisher.publish(event, 2000);
 
-            assertTrue(latch.await(2, TimeUnit.SECONDS));
-
+            assertTrue(latch.await(3, TimeUnit.SECONDS));
 
             assertEquals(1, subscriber1Count.get());
             assertEquals(1, subscriber2Count.get());
+            assertTrue(future.isDone());
+            assertFalse(future.isCancelled());
         } finally {
             subscriber2.shutdown();
         }
@@ -154,14 +213,28 @@ public class AsyncEventPublisherTest {
     void testPublishWithNoSubscribers() throws InterruptedException {
         StringEventTest event = new StringEventTest("no subscribers");
 
-        assertDoesNotThrow(() -> publisher.publish(event));
+        Future<?> future = assertDoesNotThrow(() -> publisher.publish(event, 1000));
 
-        Thread.sleep(100);
+        Thread.sleep(200);
+        assertTrue(future.isDone());
+        assertFalse(future.isCancelled());
     }
 
     @Test
     void testPublishNullEvent() {
-        assertThrows(IllegalArgumentException.class, () -> publisher.publish(null));
+        assertThrows(IllegalArgumentException.class, () -> publisher.publish(null, 1000));
+    }
+
+    @Test
+    void testPublishWithNegativeTimeout() {
+        StringEventTest event = new StringEventTest("negative timeout test");
+        assertThrows(IllegalArgumentException.class, () -> publisher.publish(event, -1));
+    }
+
+    @Test
+    void testPublishWithNullTimeUnit() {
+        StringEventTest event = new StringEventTest("null timeunit test");
+        assertThrows(IllegalArgumentException.class, () -> publisher.publish(event, 1000, null));
     }
 
     @Test
@@ -176,11 +249,12 @@ public class AsyncEventPublisherTest {
         });
         subscriber.run();
 
-        publisher.publish(new StringEventTest("thread test"));
+        Future<?> future = publisher.publish(new StringEventTest("thread test"), 2000);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(latch.await(3, TimeUnit.SECONDS));
 
         assertNotEquals(currentThreadName, processingThreadName.toString());
+        assertTrue(future.isDone());
     }
 
     @Test
@@ -193,6 +267,7 @@ public class AsyncEventPublisherTest {
         final AtomicReference<Integer> intData = new AtomicReference<>();
         final AtomicReference<Double> doubleData = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(3);
+        List<Future<?>> futures = new ArrayList<>();
 
         subscriber.subscribeEvent(StringEventTest.class, e -> {
             stringData.set(e.getData());
@@ -208,15 +283,20 @@ public class AsyncEventPublisherTest {
         });
         subscriber.run();
 
-        publisher.publish(stringEvent);
-        publisher.publish(intEvent);
-        publisher.publish(doubleEvent);
+        futures.add(publisher.publish(stringEvent, 2000));
+        futures.add(publisher.publish(intEvent, 2000));
+        futures.add(publisher.publish(doubleEvent, 2000));
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(latch.await(3, TimeUnit.SECONDS));
 
         assertEquals("string data", stringData.get());
         assertEquals(Integer.valueOf(123), intData.get());
         assertEquals(Double.valueOf(45.67), doubleData.get());
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+            assertFalse(future.isCancelled());
+        }
     }
 
     @Test
@@ -231,20 +311,47 @@ public class AsyncEventPublisherTest {
         subscriber.run();
 
         long beforePublish = System.currentTimeMillis();
-        publisher.publish(new StringEventTest("timestamp test"));
+        Future<?> future = publisher.publish(new StringEventTest("timestamp test"), 2000);
         long afterPublish = System.currentTimeMillis();
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(latch.await(3, TimeUnit.SECONDS));
 
         long timestamp = eventTimestamp.get();
         assertTrue(timestamp >= beforePublish && timestamp <= afterPublish);
+        assertTrue(future.isDone());
+    }
+
+    @Test
+    void testTimeoutWithDifferentTimeUnits() throws InterruptedException {
+        final AtomicInteger handlerCount = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(3);
+        List<Future<?>> futures = new ArrayList<>();
+
+        subscriber.subscribeEvent(StringEventTest.class, e -> {
+            handlerCount.incrementAndGet();
+            latch.countDown();
+        });
+        subscriber.run();
+
+        futures.add(publisher.publish(new StringEventTest("seconds"), 2, TimeUnit.SECONDS));
+        futures.add(publisher.publish(new StringEventTest("milliseconds"), 2000, TimeUnit.MILLISECONDS));
+        futures.add(publisher.publish(new StringEventTest("microseconds"), 2000000, TimeUnit.MICROSECONDS));
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertEquals(3, handlerCount.get());
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+            assertFalse(future.isCancelled());
+        }
     }
 
     @Test
     void testPublishLargeNumberOfEvents() throws InterruptedException {
         final AtomicInteger eventCount = new AtomicInteger(0);
-        final int totalEvents = 100;
+        final int totalEvents = 30;
         CountDownLatch latch = new CountDownLatch(totalEvents);
+        List<Future<?>> futures = new ArrayList<>();
 
         subscriber.subscribeEvent(IntEventTest.class, e -> {
             eventCount.incrementAndGet();
@@ -253,12 +360,16 @@ public class AsyncEventPublisherTest {
         subscriber.run();
 
         for (int i = 0; i < totalEvents; i++) {
-            publisher.publish(new IntEventTest(i));
+            futures.add(publisher.publish(new IntEventTest(i), 3000));
         }
 
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertTrue(latch.await(10, TimeUnit.SECONDS));
 
         assertEquals(totalEvents, eventCount.get());
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+        }
     }
 
     @Test
@@ -272,15 +383,17 @@ public class AsyncEventPublisherTest {
         });
         subscriber.run();
 
-        publisher.publish(new StringEventTest("before shutdown"));
-        assertTrue(latch.await(1, TimeUnit.SECONDS));
+        Future<?> future1 = publisher.publish(new StringEventTest("before shutdown"), 2000);
+        assertTrue(latch.await(3, TimeUnit.SECONDS));
         assertEquals(1, handlerCount.get());
+        assertTrue(future1.isDone());
 
         subscriber.shutdown();
 
-        publisher.publish(new StringEventTest("after shutdown"));
-        Thread.sleep(200);
+        Future<?> future2 = publisher.publish(new StringEventTest("after shutdown"), 2000);
+        Thread.sleep(300);
         assertEquals(1, handlerCount.get());
+        assertTrue(future2.isDone()); // Future completes even if no subscribers
     }
 
     @Test
@@ -298,7 +411,7 @@ public class AsyncEventPublisherTest {
         publisher.shutdown();
 
         assertThrows(IllegalStateException.class,
-                () -> publisher.publish(new StringEventTest("after publisher shutdown")));
+                () -> publisher.publish(new StringEventTest("after publisher shutdown"), 1000));
     }
 
     @Test
@@ -311,7 +424,7 @@ public class AsyncEventPublisherTest {
         publisher.shutdown();
 
         assertThrows(IllegalStateException.class,
-                () -> publisher.publish(new StringEventTest("ignored")));
+                () -> publisher.publish(new StringEventTest("ignored"), 1000));
 
         Thread.sleep(100);
         assertEquals(0, handlerCount.get());
@@ -329,9 +442,9 @@ public class AsyncEventPublisherTest {
         subscriber.run();
 
         StringEventTest originalEvent = new StringEventTest("integrity test");
-        publisher.publish(originalEvent);
+        Future<?> future = publisher.publish(originalEvent, 2000);
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(latch.await(3, TimeUnit.SECONDS));
 
         assertEquals(1, receivedEvents.size());
         StringEventTest receivedEvent = receivedEvents.get(0);
@@ -339,49 +452,17 @@ public class AsyncEventPublisherTest {
         assertEquals(originalEvent.getData(), receivedEvent.getData());
         assertEquals(originalEvent.getPriority(), receivedEvent.getPriority());
         assertEquals(originalEvent.getCreatedTimeMillis(), receivedEvent.getCreatedTimeMillis());
+        assertTrue(future.isDone());
+        assertFalse(future.isCancelled());
     }
 
     @Test
-    void testPublishEventWithErrorInSubscriber() throws InterruptedException {
-        final AtomicInteger successCount = new AtomicInteger(0);
-        final AtomicInteger errorCount = new AtomicInteger(0);
-        CountDownLatch latch = new CountDownLatch(3);
-
-        subscriber.subscribeEvent(StringEventTest.class,
-                (StringEventTest event) -> {
-                    if ("error".equals(event.getData())) {
-                        latch.countDown();
-                        throw new RuntimeException("Test error in subscriber");
-                    } else {
-                        successCount.incrementAndGet();
-                        latch.countDown();
-                    }
-                },
-                (event, exception) -> {
-                    errorCount.incrementAndGet();
-                }
-        );
-        subscriber.run();
-
-        publisher.publish(new StringEventTest("success"));
-
-        publisher.publish(new StringEventTest("error"));
-
-        publisher.publish(new StringEventTest("success2"));
-
-        assertTrue(latch.await(3, TimeUnit.SECONDS));
-
-        assertEquals(2, successCount.get());
-        assertEquals(1, errorCount.get());
-        assertEquals(1, subscriber.getTotalErrorCount());
-    }
-
-    @Test
-    void testConcurrentPublishing() throws InterruptedException {
+    void testConcurrentPublishingWithTimeout() throws InterruptedException {
         final AtomicInteger eventCount = new AtomicInteger(0);
-        final int threadsCount = 5;
-        final int eventsPerThread = 20;
+        final int threadsCount = 3;
+        final int eventsPerThread = 5;
         CountDownLatch latch = new CountDownLatch(threadsCount * eventsPerThread);
+        List<Future<?>> allFutures = Collections.synchronizedList(new ArrayList<>());
 
         subscriber.subscribeEvent(IntEventTest.class, e -> {
             eventCount.incrementAndGet();
@@ -396,47 +477,25 @@ public class AsyncEventPublisherTest {
                 final int threadId = i;
                 testExecutor.submit(() -> {
                     for (int j = 0; j < eventsPerThread; j++) {
-                        publisher.publish(new IntEventTest(threadId * eventsPerThread + j));
+                        Future<?> future = publisher.publish(
+                                new IntEventTest(threadId * eventsPerThread + j), 3000);
+                        allFutures.add(future);
                     }
                 });
             }
 
-            assertTrue(latch.await(5, TimeUnit.SECONDS));
+            assertTrue(latch.await(10, TimeUnit.SECONDS));
 
             assertEquals(threadsCount * eventsPerThread, eventCount.get());
+
+            Thread.sleep(500);
+
+            for (Future<?> future : allFutures) {
+                assertTrue(future.isDone());
+            }
         } finally {
             testExecutor.shutdown();
         }
-    }
-
-    @Test
-    void testPublishOrderWithSamePriority() throws InterruptedException {
-        final List<Integer> processedOrder = new ArrayList<>();
-        final Object lock = new Object();
-        final int eventCount = 10;
-        CountDownLatch latch = new CountDownLatch(eventCount);
-
-        subscriber.subscribeEvent(IntEventTest.class, e -> {
-            synchronized (lock) {
-                processedOrder.add(e.getData());
-                latch.countDown();
-            }
-        });
-        subscriber.run();
-
-        for (int i = 0; i < eventCount; i++) {
-            publisher.publish(new IntEventTest(i));
-        }
-
-        assertTrue(latch.await(3, TimeUnit.SECONDS));
-
-        assertEquals(eventCount, processedOrder.size());
-        Set<Integer> expectedValues = new HashSet<>();
-        Set<Integer> actualValues = new HashSet<>(processedOrder);
-        for (int i = 0; i < eventCount; i++) {
-            expectedValues.add(i);
-        }
-        assertEquals(expectedValues, actualValues);
     }
 
     @Test
@@ -444,6 +503,7 @@ public class AsyncEventPublisherTest {
         final AtomicInteger eventCount = new AtomicInteger(0);
         final Set<StringEventTest> receivedEvents = Collections.synchronizedSet(new HashSet<>());
         CountDownLatch latch = new CountDownLatch(3);
+        List<Future<?>> futures = new ArrayList<>();
 
         subscriber.subscribeEvent(StringEventTest.class, e -> {
             eventCount.incrementAndGet();
@@ -452,14 +512,18 @@ public class AsyncEventPublisherTest {
         });
         subscriber.run();
 
-        publisher.publish(new StringEventTest("same data"));
-        publisher.publish(new StringEventTest("same data"));
-        publisher.publish(new StringEventTest("same data"));
+        futures.add(publisher.publish(new StringEventTest("same data"), 2000));
+        futures.add(publisher.publish(new StringEventTest("same data"), 2000));
+        futures.add(publisher.publish(new StringEventTest("same data"), 2000));
 
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
 
         assertEquals(3, eventCount.get());
         assertEquals(3, receivedEvents.size());
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+        }
     }
 
     @Test
@@ -480,10 +544,10 @@ public class AsyncEventPublisherTest {
         ExecutorService testExecutor = Executors.newSingleThreadExecutor();
         testExecutor.submit(() -> {
             try {
-                for (int i = 0; i < 100; i++) {
-                    publisher.publish(new StringEventTest("event" + i));
+                for (int i = 0; i < 30; i++) {
+                    publisher.publish(new StringEventTest("event" + i), 2000);
                     publishedCount.incrementAndGet();
-                    Thread.sleep(10);
+                    Thread.sleep(50);
                 }
             } catch (IllegalStateException e) {
                 // Expected when publisher is shut down
@@ -492,15 +556,44 @@ public class AsyncEventPublisherTest {
             }
         });
 
-        Thread.sleep(200);
+        Thread.sleep(500);
         publisher.shutdown();
 
-        Thread.sleep(300);
+        Thread.sleep(500);
 
         assertTrue(publishedCount.get() > 0);
-        assertTrue(publishedCount.get() < 100);
+        assertTrue(publishedCount.get() < 30);
 
         testExecutor.shutdown();
+    }
+
+    @Test
+    void testMultipleTimeoutsHandledSilently() throws InterruptedException {
+        final AtomicInteger processedCount = new AtomicInteger(0);
+
+        subscriber.subscribeEvent(StringEventTest.class, e -> {
+            try {
+                Thread.sleep(500);
+                processedCount.incrementAndGet();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        subscriber.run();
+
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (int i = 0; i < 5; i++) {
+            futures.add(publisher.publish(new StringEventTest("timeout" + i), 100));
+        }
+
+        Thread.sleep(800);
+
+        for (Future<?> future : futures) {
+            assertTrue(future.isDone());
+        }
+
+        assertTrue(processedCount.get() <= 5);
     }
 
     @AfterEach

@@ -5,7 +5,7 @@ import EventTests.TestsEvents.IntEventTest;
 import EventTests.TestsEvents.StringEventTest;
 import com.jopencl.Event.EventManager;
 import com.jopencl.Event.EventPriority;
-import com.jopencl.Event.EventSubscribers.SyncSingleEventSubscriber;
+import com.jopencl.Event.EventSubscribers.SyncEventSubscriber;
 import com.jopencl.Event.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,12 +17,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SyncEventSubscriberTest {
-    private SyncSingleEventSubscriber subscriber;
+    private SyncEventSubscriber subscriber;
     private final EventManager eventManager = EventManager.getInstance();
 
     @BeforeEach
     void setUp() {
-        subscriber = new SyncSingleEventSubscriber();
+        subscriber = new SyncEventSubscriber();
     }
 
     @Test
@@ -153,7 +153,7 @@ public class SyncEventSubscriberTest {
         subscriber.run();
         assertEquals(eventManager.getSubscriberCount(), 1);
 
-        SyncSingleEventSubscriber anotherSubscriber = new SyncSingleEventSubscriber(true);
+        SyncEventSubscriber anotherSubscriber = new SyncEventSubscriber(true);
         assertEquals(eventManager.getSubscriberCount(), 2);
 
         subscriber.shutdown();

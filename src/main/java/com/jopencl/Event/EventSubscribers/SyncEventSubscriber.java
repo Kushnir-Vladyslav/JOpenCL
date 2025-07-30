@@ -4,14 +4,14 @@ import com.jopencl.Event.Event;
 import com.jopencl.Event.ProcessingSingleEventErrorSubscriber;
 import com.jopencl.Event.Status;
 
-public class SyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscriber {
-    public SyncSingleEventSubscriber(boolean autoRun) {
+public class SyncEventSubscriber extends ProcessingSingleEventErrorSubscriber {
+    public SyncEventSubscriber(boolean autoRun) {
         if (autoRun) {
             run();
         }
     }
 
-    public SyncSingleEventSubscriber() {
+    public SyncEventSubscriber() {
         this(false);
     }
 
@@ -21,7 +21,7 @@ public class SyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscri
             status = Status.RUNNING;
             subscribe();
         } else if (status == Status.SHUTDOWN) {
-            throw new IllegalStateException("SyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("SyncEventSubscriber was already disabled.");
         }
     }
 
@@ -40,7 +40,7 @@ public class SyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscri
             status = Status.PAUSED;
             unsubscribe();
         } else if (status == Status.SHUTDOWN) {
-            throw new IllegalStateException("SyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("SyncEventSubscriber was already disabled.");
         }
     }
 
@@ -49,7 +49,7 @@ public class SyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscri
         if (status == Status.RUNNING || status == Status.PAUSED) {
             super.stop();
         } else if (status == Status.SHUTDOWN) {
-            throw new IllegalStateException("SyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("SyncEventSubscriber was already disabled.");
         }
     }
 
@@ -59,7 +59,7 @@ public class SyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscri
             status = Status.SHUTDOWN;
             unsubscribe();
         } else {
-            throw new IllegalStateException("SyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("SyncEventSubscriber was already disabled.");
         }
     }
 }

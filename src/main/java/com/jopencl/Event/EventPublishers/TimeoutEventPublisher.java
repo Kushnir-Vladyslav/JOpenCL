@@ -1,16 +1,20 @@
 package com.jopencl.Event.EventPublishers;
 
+import com.jopencl.Event.ControlledListFuture;
 import com.jopencl.Event.Event;
 import com.jopencl.Event.ExecuteEventPublisher;
 
 import java.util.concurrent.*;
 
 public class TimeoutEventPublisher extends ExecuteEventPublisher {
+    private final ControlledListFuture listFuture;
+
     public TimeoutEventPublisher (TimeUnit timeUnit) {
         if (timeUnit == null) {
             throw new IllegalArgumentException("TimeUnit cannot be null");
         }
         executor = Executors.newFixedThreadPool(1);
+        listFuture = new ControlledListFuture();
         this.timeUnit = timeUnit;
     }
 
@@ -45,5 +49,12 @@ public class TimeoutEventPublisher extends ExecuteEventPublisher {
 
     public void publish(Event<?> event, long timeout) {
         publish(event, timeout, timeUnit);
+    }
+
+    @Override
+    public void shutdown() {
+        checkNotShutdown();
+        listFuture.stopControlAndShutdown();
+        super.shutdown();
     }
 }

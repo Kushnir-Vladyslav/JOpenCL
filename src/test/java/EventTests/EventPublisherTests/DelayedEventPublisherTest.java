@@ -6,8 +6,8 @@ import EventTests.TestsEvents.StringEventTest;
 import com.jopencl.Event.EventManager;
 import com.jopencl.Event.EventPriority;
 import com.jopencl.Event.EventPublishers.DelayedEventPublisher;
-import com.jopencl.Event.EventSubscribers.AsyncSingleEventSubscriber;
-import com.jopencl.Event.EventSubscribers.SyncSingleEventSubscriber;
+import com.jopencl.Event.EventSubscribers.AsyncEventSubscriber;
+import com.jopencl.Event.EventSubscribers.SyncEventSubscriber;
 import com.jopencl.Event.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,13 +23,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class DelayedEventPublisherTest {
     private DelayedEventPublisher publisher;
-    private AsyncSingleEventSubscriber subscriber;
+    private AsyncEventSubscriber subscriber;
     private final EventManager eventManager = EventManager.getInstance();
 
     @BeforeEach
     void setUp() {
         publisher = new DelayedEventPublisher();
-        subscriber = new AsyncSingleEventSubscriber();
+        subscriber = new AsyncEventSubscriber();
     }
 
     @Test
@@ -368,7 +368,7 @@ public class DelayedEventPublisherTest {
 
     @Test
     void testEventWithPriority() throws InterruptedException {
-        SyncSingleEventSubscriber syncSubscriber = new SyncSingleEventSubscriber();
+        SyncEventSubscriber syncSubscriber = new SyncEventSubscriber();
         StringBuilder processOrder = new StringBuilder();
 
         syncSubscriber.subscribeEvent(StringEventTest.class, event ->

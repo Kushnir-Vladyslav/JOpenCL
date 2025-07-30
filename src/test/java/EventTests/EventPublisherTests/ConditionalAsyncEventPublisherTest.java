@@ -5,7 +5,7 @@ import EventTests.TestsEvents.StringEventTest;
 import com.jopencl.Event.EventManager;
 import com.jopencl.Event.EventPriority;
 import com.jopencl.Event.EventPublishers.ConditionalAsyncEventPublisher;
-import com.jopencl.Event.EventSubscribers.SyncSingleEventSubscriber;
+import com.jopencl.Event.EventSubscribers.SyncEventSubscriber;
 import com.jopencl.Event.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,13 +21,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ConditionalAsyncEventPublisherTest {
     private ConditionalAsyncEventPublisher publisher;
-    private SyncSingleEventSubscriber subscriber;
+    private SyncEventSubscriber subscriber;
     private final EventManager eventManager = EventManager.getInstance();
 
     @BeforeEach
     void setUp() {
         publisher = new ConditionalAsyncEventPublisher(event -> true);
-        subscriber = new SyncSingleEventSubscriber();
+        subscriber = new SyncEventSubscriber();
     }
 
     @Test
@@ -312,7 +312,7 @@ public class ConditionalAsyncEventPublisherTest {
     void testMultipleSubscribersWithCondition() throws InterruptedException {
         publisher.setCondition(event -> event instanceof StringEventTest);
 
-        SyncSingleEventSubscriber subscriber2 = new SyncSingleEventSubscriber();
+        SyncEventSubscriber subscriber2 = new SyncEventSubscriber();
         final AtomicInteger subscriber1Count = new AtomicInteger(0);
         final AtomicInteger subscriber2Count = new AtomicInteger(0);
 

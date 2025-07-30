@@ -5,7 +5,7 @@ import EventTests.TestsEvents.IntEventTest;
 import EventTests.TestsEvents.StringEventTest;
 import com.jopencl.Event.EventManager;
 import com.jopencl.Event.EventPriority;
-import com.jopencl.Event.EventSubscribers.AsyncSingleEventSubscriber;
+import com.jopencl.Event.EventSubscribers.AsyncEventSubscriber;
 import com.jopencl.Event.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,12 +20,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class AsyncEventSubscriberTests {
-    private AsyncSingleEventSubscriber subscriber;
+    private AsyncEventSubscriber subscriber;
     private final EventManager eventManager = EventManager.getInstance();
 
     @BeforeEach
     void setUp() {
-        subscriber = new AsyncSingleEventSubscriber();
+        subscriber = new AsyncEventSubscriber();
     }
 
     @Test
@@ -176,7 +176,7 @@ public class AsyncEventSubscriberTests {
         subscriber.run();
         assertEquals(eventManager.getSubscriberCount(), 1);
 
-        AsyncSingleEventSubscriber anotherSubscriber = new AsyncSingleEventSubscriber(true);
+        AsyncEventSubscriber anotherSubscriber = new AsyncEventSubscriber(true);
         assertEquals(eventManager.getSubscriberCount(), 2);
 
         subscriber.shutdown();
@@ -346,7 +346,7 @@ public class AsyncEventSubscriberTests {
 
     @Test
     void testConstructorWithAutoRunFalse() {
-        AsyncSingleEventSubscriber testSubscriber = new AsyncSingleEventSubscriber(false);
+        AsyncEventSubscriber testSubscriber = new AsyncEventSubscriber(false);
 
         assertEquals(Status.CREATED, testSubscriber.getStatus());
         assertEquals(0, eventManager.getSubscriberCount());
@@ -356,7 +356,7 @@ public class AsyncEventSubscriberTests {
 
     @Test
     void testConstructorWithAutoRunTrue() {
-        AsyncSingleEventSubscriber testSubscriber = new AsyncSingleEventSubscriber(true);
+        AsyncEventSubscriber testSubscriber = new AsyncEventSubscriber(true);
 
         assertEquals(Status.RUNNING, testSubscriber.getStatus());
         assertEquals(1, eventManager.getSubscriberCount());

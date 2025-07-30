@@ -6,8 +6,8 @@ import EventTests.TestsEvents.StringEventTest;
 import com.jopencl.Event.EventManager;
 import com.jopencl.Event.EventPriority;
 import com.jopencl.Event.EventPublishers.BatchEventPublisher;
-import com.jopencl.Event.EventSubscribers.AsyncSingleEventSubscriber;
-import com.jopencl.Event.EventSubscribers.SyncSingleEventSubscriber;
+import com.jopencl.Event.EventSubscribers.AsyncEventSubscriber;
+import com.jopencl.Event.EventSubscribers.SyncEventSubscriber;
 import com.jopencl.Event.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,13 +25,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class BatchEventPublisherTest {
     private BatchEventPublisher publisher;
-    private AsyncSingleEventSubscriber subscriber;
+    private AsyncEventSubscriber subscriber;
     private final EventManager eventManager = EventManager.getInstance();
 
     @BeforeEach
     void setUp() {
         publisher = new BatchEventPublisher(3); // Default batch size of 3
-        subscriber = new AsyncSingleEventSubscriber();
+        subscriber = new AsyncEventSubscriber();
     }
 
     @Test
@@ -165,7 +165,7 @@ public class BatchEventPublisherTest {
 
     @Test
     void testBatchEventPriority() throws InterruptedException {
-        SyncSingleEventSubscriber syncSubscriber = new SyncSingleEventSubscriber();
+        SyncEventSubscriber syncSubscriber = new SyncEventSubscriber();
         StringBuilder processOrder = new StringBuilder();
 
         syncSubscriber.subscribeEvent(StringEventTest.class, event ->

@@ -8,11 +8,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-public class AsyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscriber {
+public class AsyncEventSubscriber extends ProcessingSingleEventErrorSubscriber {
     private final ExecutorService executor;
     private volatile Future<?> dispatchTask;
 
-    public AsyncSingleEventSubscriber(boolean autoRun) {
+    public AsyncEventSubscriber(boolean autoRun) {
         executor = Executors.newFixedThreadPool(1);
 
         if (autoRun) {
@@ -20,7 +20,7 @@ public class AsyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscr
         }
     }
 
-    public AsyncSingleEventSubscriber() {
+    public AsyncEventSubscriber() {
         this(false);
     }
 
@@ -31,7 +31,7 @@ public class AsyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscr
             subscribe();
             dispatchTask = executor.submit(this::processEvents);
         } else if (status == Status.SHUTDOWN) {
-            throw new IllegalStateException("AsyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("AsyncEventSubscriber was already disabled.");
         }
     }
 
@@ -55,7 +55,7 @@ public class AsyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscr
             unsubscribe();
             dispatchTask.cancel(true);
         } else if (status == Status.SHUTDOWN) {
-            throw new IllegalStateException("AsyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("AsyncEventSubscriber was already disabled.");
         }
     }
 
@@ -65,7 +65,7 @@ public class AsyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscr
             dispatchTask.cancel(true);
             super.stop();
         } else if (status == Status.SHUTDOWN) {
-            throw new IllegalStateException("AsyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("AsyncEventSubscriber was already disabled.");
         }
     }
 
@@ -76,7 +76,7 @@ public class AsyncSingleEventSubscriber extends ProcessingSingleEventErrorSubscr
             unsubscribe();
             executor.shutdownNow();
         } else {
-            throw new IllegalStateException("AsyncSingleEventSubscriber was already disabled.");
+            throw new IllegalStateException("AsyncEventSubscriber was already disabled.");
         }
     }
 }

@@ -33,8 +33,8 @@ public class PeriodicEventPublisher extends ScheduleEventPublisher {
         if (identifier == null) {
             throw new IllegalArgumentException("Identifier cannot be null");
         }
-        if (period < 0) {
-            throw new IllegalArgumentException("Period cannot be negative");
+        if (period <= 0) {
+            throw new IllegalArgumentException("Period must be positive");
         }
         if (timeUnit == null) {
             throw new IllegalArgumentException("TimeUnit cannot be null");
