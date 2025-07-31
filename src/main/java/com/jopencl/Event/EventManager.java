@@ -10,7 +10,16 @@ import org.slf4j.LoggerFactory;
  * Central event management system that implements the Singleton pattern.
  * Handles event publishing, subscription, and dispatching to registered subscribers.
  * Thread-safe implementation using {@link CopyOnWriteArrayList} for subscribers
- * and {@link LinkedBlockingQueue} for event queue.
+ * and {@link PriorityBlockingQueue} for event queue.
+ *
+ * <p>The EventManager supports the following lifecycle states:
+ * <ul>
+ * <li>{@code CREATED} - Initial state after instantiation</li>
+ * <li>{@code RUNNING} - Active event processing</li>
+ * <li>{@code PAUSED} - Temporarily stopped, can be resumed</li>
+ * <li>{@code STOPPED} - Stopped, can be restarted</li>
+ * <li>{@code SHUTDOWN} - Permanently disabled</li>
+ * </ul>
  *
  * @author Vladyslav Kushnir
  * @version 1.0
@@ -108,6 +117,8 @@ public class EventManager {
 
         LOGGER.debug("Registering subscriber: {}", subscriber.getClass().getSimpleName());
         subscribers.add(subscriber);
+        LOGGER.info("Subscriber {} registered successfully. Total subscribers: {}",
+                subscriber.getClass().getSimpleName(), subscribers.size());
     }
 
     /**
@@ -122,8 +133,14 @@ public class EventManager {
             throw new IllegalArgumentException("Subscriber cannot be null");
         }
 
-        LOGGER.debug("Unregistering subscriber: {}", subscriber.getClass().getSimpleName());
-        subscribers.remove(subscriber);
+        boolean removed = subscribers.remove(subscriber);
+        if (removed) {
+            LOGGER.info("Subscriber {} unregistered successfully. Total subscribers: {}",
+                    subscriber.getClass().getSimpleName(), subscribers.size());
+        } else {
+            LOGGER.warn("Attempted to unregister subscriber {} that was not registered",
+                    subscriber.getClass().getSimpleName());
+        }
     }
 
     /**
@@ -152,6 +169,12 @@ public class EventManager {
         LOGGER.info("Event dispatch thread stopped");
     }
 
+    /**
+     * Temporarily pauses the event dispatch thread.
+     * The EventManager can be resumed by calling {@link #run()}.
+     *
+     * @throws IllegalStateException if the EventManager is already shut down
+     */
     public void pause() {
         if (status == Status.RUNNING) {
             LOGGER.info("Stopping EventManager");
@@ -191,7 +214,7 @@ public class EventManager {
             executor.shutdownNow();
             eventQueue.clear();
         } else {
-                LOGGER.error("Attempted to shutdown the disabled EventManager");
+            LOGGER.error("Attempted to shutdown the disabled EventManager");
             throw new IllegalStateException("EventManager was already disabled.");
         }
     }
@@ -216,7 +239,23 @@ public class EventManager {
         return eventQueue.size();
     }
 
+    /**
+     * Returns the current status of the EventManager.
+     * This method is primarily for testing and monitoring.
+     *
+     * @return the current status of the EventManager
+     */
     public Status getStatus() {
         return status;
+    }
+
+    /**
+     * Returns comprehensive status information about the EventManager.
+     *
+     * @return status information including queue size, subscriber count, and current state
+     */
+    public String getStatusInfo() {
+        return String.format("EventManager[status=%s, subscribers=%d, queueSize=%d]",
+                status, subscribers.size(), eventQueue.size());
     }
 }
