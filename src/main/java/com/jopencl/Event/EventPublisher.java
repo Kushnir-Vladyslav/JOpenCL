@@ -109,6 +109,27 @@ public abstract class EventPublisher {
     public abstract void shutdown();
 
     /**
+     * Sets the status of this publisher and logs the change.
+     * This method is protected to allow subclasses to manage their lifecycle.
+     *
+     * @param newStatus the new status to set, must not be null
+     * @throws IllegalArgumentException if newStatus is null
+     */
+    protected void setStatus(Status newStatus) {
+        if (newStatus == null) {
+            throw new IllegalArgumentException("Status cannot be null");
+        }
+
+        Status oldStatus = this.status;
+        this.status = newStatus;
+
+        if (oldStatus != newStatus) {
+            LOGGER.info("Publisher {} status changed from {} to {}",
+                    this.getClass().getSimpleName(), oldStatus, newStatus);
+        }
+    }
+
+    /**
      * Returns a string representation of this publisher including its class name and status.
      *
      * @return a string representation of this publisher

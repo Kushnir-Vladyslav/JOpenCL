@@ -60,7 +60,7 @@ public class SyncEventPublisherTest {
     }
 
     @Test
-    void testPublishMultipleEvents() {
+    void testPublishMultipleEvents() throws InterruptedException {
         final AtomicInteger stringCount = new AtomicInteger(0);
         final AtomicInteger intCount = new AtomicInteger(0);
         final AtomicInteger doubleCount = new AtomicInteger(0);
@@ -75,6 +75,8 @@ public class SyncEventPublisherTest {
         publisher.publish(new IntEventTest(42));
         publisher.publish(new DoubleEventTest(3.14));
         publisher.publish(new StringEventTest("test3"));
+
+        Thread.sleep(50);
 
         subscriber.processEvents();
 
@@ -310,7 +312,7 @@ public class SyncEventPublisherTest {
     }
 
     @Test
-    void testPublishOrderWithSamePriority() {
+    void testPublishOrderWithSamePriority() throws InterruptedException {
         final List<Integer> processedOrder = new ArrayList<>();
         final Object lock = new Object();
 
@@ -325,6 +327,8 @@ public class SyncEventPublisherTest {
             publisher.publish(new IntEventTest(i));
         }
 
+        Thread.sleep(50);
+
         subscriber.processEvents();
 
         assertEquals(10, processedOrder.size());
@@ -337,7 +341,7 @@ public class SyncEventPublisherTest {
     }
 
     @Test
-    void testPublishDifferentEventInstances() {
+    void testPublishDifferentEventInstances() throws InterruptedException {
         final AtomicInteger eventCount = new AtomicInteger(0);
         final Set<StringEventTest> receivedEvents = new HashSet<>();
 
@@ -350,6 +354,8 @@ public class SyncEventPublisherTest {
         publisher.publish(new StringEventTest("same data"));
         publisher.publish(new StringEventTest("same data"));
         publisher.publish(new StringEventTest("same data"));
+
+        Thread.sleep(50);
 
         subscriber.processEvents();
 

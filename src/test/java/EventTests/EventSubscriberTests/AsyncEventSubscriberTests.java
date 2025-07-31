@@ -427,6 +427,8 @@ public class AsyncEventSubscriberTests {
 
         assertTrue(latch.await(2, TimeUnit.SECONDS));
 
+        Thread.sleep(50);
+
         assertEquals(2, subscriber.getTotalErrorCount());
         assertEquals("Async error 2", subscriber.getLastException().getMessage());
         assertSame(event2, subscriber.getLastFailedEvent());

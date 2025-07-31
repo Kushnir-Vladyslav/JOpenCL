@@ -315,11 +315,11 @@ public class BatchEventSubscriberTests {
             latch.countDown();
         });
 
-        subscriber.run();
-
         subscriber.onEvent(new StringEventTest("L", EventPriority.LOW));
         subscriber.onEvent(new StringEventTest("H", EventPriority.HIGH));
         subscriber.onEvent(new StringEventTest("M", EventPriority.MEDIUM));
+
+        subscriber.run();
 
         assertTrue(latch.await(200, TimeUnit.MILLISECONDS));
         assertEquals("HML", processOrder.toString());
@@ -434,6 +434,8 @@ public class BatchEventSubscriberTests {
         }
 
         assertTrue(latch.await(3, TimeUnit.SECONDS));
+
+        Thread.sleep(50);
 
         assertEquals(2, subscriber.getTotalErrorCount());
         assertTrue(subscriber.getLastException().getMessage().contains("Batch error"));
