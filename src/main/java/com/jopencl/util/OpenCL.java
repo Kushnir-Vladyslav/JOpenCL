@@ -3,66 +3,69 @@ package com.jopencl.util;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.opencl.CL;
 import org.lwjgl.opencl.CL10;
-import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
 import java.nio.IntBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class OpenCL {
-    OpenClContext context = new OpenClContext();
+    private static AtomicInteger createdOpenCL = new AtomicInteger(0);
+    private static volatile OpenCLInfo info;
+    private static final Object lock = new Object();
 
-    public OpenCL () {
+    private StatusCL status = StatusCL.CLOSED;
 
-        org.lwjgl.system.Configuration.OPENCL_EXPLICIT_INIT.set(true);
-        CL.create();
-
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-
-            IntBuffer platformCount = stack.mallocInt(1);
-            CL10.clGetPlatformIDs(null, platformCount);
-
-            PointerBuffer platforms = stack.mallocPointer(platformCount.get(0));
-            CL10.clGetPlatformIDs(platforms, (IntBuffer) null);
-
-//            platformInfo (platformCount,  platforms);
-
-            long platform = platforms.get(0);
-
-            IntBuffer deviceCount = stack.mallocInt(1);
-            CL10.clGetDeviceIDs(platform, CL10.CL_DEVICE_TYPE_GPU, null, deviceCount);
-
-            PointerBuffer devices = stack.mallocPointer(deviceCount.get(0));
-            CL10.clGetDeviceIDs(platform, CL10.CL_DEVICE_TYPE_GPU, devices, (IntBuffer) null);
-
-            context.device = devices.get(0);
-
-//            deviceDiagnostic ();
-
-            PointerBuffer contextProperties = stack.mallocPointer(3)
-                    .put(CL10.CL_CONTEXT_PLATFORM)
-                    .put(platform)
-                    .put(0)
-                    .rewind();
-
-            context.context = CL10.clCreateContext(contextProperties, context.device, null, 0, null);
-            context.commandQueue = CL10.clCreateCommandQueue(context.context, context.device, CL10.CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, (IntBuffer) null);
-
-            if (context.context == 0 || context.commandQueue == 0) {
-                throw new IllegalStateException("Failed to create OpenCL context or command queue.");
+    protected OpenCL() {
+        synchronized (lock) {
+            if (info == null) {
+                createOpenClInfo();
             }
+        }
 
-        } catch (Exception e) {
-            e.printStackTrace();
+    }
+
+    private void start() {
+        if (!isRunning()) {
+            setStatus(StatusCL.RUNNING);
+            if (createdOpenCL.incrementAndGet() == 1) {
+                org.lwjgl.system.Configuration.OPENCL_EXPLICIT_INIT.set(true);
+                CL.create();
+            }
         }
     }
 
-    public OpenClContext getContext () {
-        return context;
-    }
-
     public void destroy () {
-        context.destroy();
-
-        CL.destroy();
+        if (isRunning()) {
+            setStatus(StatusCL.CLOSED);
+            if (createdOpenCL.decrementAndGet() == 0) {
+                CL.destroy();
+            }
+        }
     }
 
+    private void createOpenClInfo () {
+        start();
+
+        IntBuffer numberPlatform = MemoryUtil.memAllocInt(1);
+        CL10.clGetPlatformIDs(null, numberPlatform);
+
+        PointerBuffer platforms = MemoryUtil.memAllocPointer(numberPlatform.get(0));
+        CL10.clGetPlatformIDs(platforms, (IntBuffer) null);
+
+        for (int i = 0; i < numberPlatform.get(0); i++) {
+            long platformID = platforms.get(i);
+
+            String name = CL10.getPlatformString(platformID, CL10.CL_PLATFORM_NAME);
+            String vendor = CL10.getPlatformString(platformID, CL10.CL_PLATFORM_VENDOR);
+            String version = CL10.getPlatformString(platformID, CL10.CL_PLATFORM_VERSION);
+        }
+    }
+
+    private boolean isRunning () {
+        return status == StatusCL.RUNNING;
+    }
+
+    private void setStatus(StatusCL statusCL) {
+        status = statusCL;
+    }
 }
