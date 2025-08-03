@@ -3,25 +3,24 @@ package com.jopencl.util;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.opencl.CL;
 import org.lwjgl.opencl.CL10;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class OpenCL {
     private static AtomicInteger createdOpenCL = new AtomicInteger(0);
-    private static volatile OpenCLInfo info;
+    private static final List<Platform> platforms = collectInformation();
     private static final Object lock = new Object();
 
     private StatusCL status = StatusCL.CLOSED;
 
-    protected OpenCL() {
-        synchronized (lock) {
-            if (info == null) {
-                createOpenClInfo();
-            }
-        }
 
+
+    protected OpenCL() {
     }
 
     private void start() {
@@ -43,22 +42,40 @@ public class OpenCL {
         }
     }
 
-    private void createOpenClInfo () {
-        start();
+    private static List<Platform> collectInformation() {
+        org.lwjgl.system.Configuration.OPENCL_EXPLICIT_INIT.set(true);
+        CL.create();
+        List<Platform> platformsList;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer numberPlatform = stack.mallocInt(1);
+            int result = CL10.clGetPlatformIDs(null, numberPlatform);
 
-        IntBuffer numberPlatform = MemoryUtil.memAllocInt(1);
-        CL10.clGetPlatformIDs(null, numberPlatform);
+            if(result != CL10.CL_SUCCESS) {
+                //log
+                //throw
+            }
 
-        PointerBuffer platforms = MemoryUtil.memAllocPointer(numberPlatform.get(0));
-        CL10.clGetPlatformIDs(platforms, (IntBuffer) null);
+            PointerBuffer platformsBuffer = stack.mallocPointer(numberPlatform.get(0));
+            result = CL10.clGetPlatformIDs(platformsBuffer, (IntBuffer) null);
 
-        for (int i = 0; i < numberPlatform.get(0); i++) {
-            long platformID = platforms.get(i);
+            if(result != CL10.CL_SUCCESS) {
+                //log
+                //throw
+            }
 
-            String name = CL10.getPlatformString(platformID, CL10.CL_PLATFORM_NAME);
-            String vendor = CL10.getPlatformString(platformID, CL10.CL_PLATFORM_VENDOR);
-            String version = CL10.getPlatformString(platformID, CL10.CL_PLATFORM_VERSION);
+            platformsList = new ArrayList<>();
+            for (int i = 0; i < numberPlatform.get(0); i++) {
+                platformsList.add(new Platform(platformsBuffer.get(i)));
+            }
         }
+
+        CL.destroy();
+
+        return platformsList;
+    }
+
+    public static List<Platform> getPlatforms() {
+        return new ArrayList<>(platforms);
     }
 
     private boolean isRunning () {
