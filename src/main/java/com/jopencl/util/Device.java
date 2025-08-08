@@ -283,6 +283,10 @@ public class Device {
         return deviceType.contains("Accelerator");
     }
 
+    public boolean belongTo(Platform platform) {
+        return this.platform.equals(platform);
+    }
+
     // ========== INFORMATION DISPLAY ==========
 
     public String getMemorySummary() {

@@ -267,6 +267,10 @@ public class Platform {
         return null;
     }
 
+    public boolean owns(Device device) {
+        return allDevices.contains(device);
+    }
+
     // ========== INFORMATION DISPLAY ==========
 
     public String getDeviceSummary() {
