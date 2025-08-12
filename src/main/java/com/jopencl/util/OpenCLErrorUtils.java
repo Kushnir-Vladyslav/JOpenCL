@@ -1,11 +1,6 @@
 package com.jopencl.util;
 
-import org.lwjgl.opencl.CL10;
-import org.lwjgl.opencl.CL11;
-import org.lwjgl.opencl.CL12;
-import org.lwjgl.opencl.CL20;
-import org.lwjgl.opencl.CL21;
-import org.lwjgl.opencl.CL22;
+import org.lwjgl.opencl.*;
 
 public class OpenCLErrorUtils {
     public static String getCLErrorString(int errorCode) {
@@ -24,8 +19,6 @@ public class OpenCLErrorUtils {
             case CL10.CL_IMAGE_FORMAT_NOT_SUPPORTED: return "CL_IMAGE_FORMAT_NOT_SUPPORTED";
             case CL10.CL_BUILD_PROGRAM_FAILURE: return "CL_BUILD_PROGRAM_FAILURE";
             case CL10.CL_MAP_FAILURE: return "CL_MAP_FAILURE";
-            case CL10.CL_MISALIGNED_SUB_BUFFER_OFFSET: return "CL_MISALIGNED_SUB_BUFFER_OFFSET";
-            case CL10.CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST: return "CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST";
             case CL10.CL_INVALID_VALUE: return "CL_INVALID_VALUE";
             case CL10.CL_INVALID_DEVICE_TYPE: return "CL_INVALID_DEVICE_TYPE";
             case CL10.CL_INVALID_PLATFORM: return "CL_INVALID_PLATFORM";
@@ -56,31 +49,35 @@ public class OpenCLErrorUtils {
             case CL10.CL_INVALID_EVENT_WAIT_LIST: return "CL_INVALID_EVENT_WAIT_LIST";
             case CL10.CL_INVALID_EVENT: return "CL_INVALID_EVENT";
             case CL10.CL_INVALID_OPERATION: return "CL_INVALID_OPERATION";
-            case CL10.CL_INVALID_GL_OBJECT: return "CL_INVALID_GL_OBJECT";
+            case CL10GL.CL_INVALID_GL_OBJECT: return "CL_INVALID_GL_OBJECT";
             case CL10.CL_INVALID_BUFFER_SIZE: return "CL_INVALID_BUFFER_SIZE";
-            case CL10.CL_INVALID_MIP_LEVEL: return "CL_INVALID_MIP_LEVEL";
+            case CL10GL.CL_INVALID_MIP_LEVEL: return "CL_INVALID_MIP_LEVEL";
             case CL10.CL_INVALID_GLOBAL_WORK_SIZE: return "CL_INVALID_GLOBAL_WORK_SIZE";
 
             // CL11
             case CL11.CL_INVALID_PROPERTY: return "CL_INVALID_PROPERTY";
+            case CL11.CL_MISALIGNED_SUB_BUFFER_OFFSET: return "CL_MISALIGNED_SUB_BUFFER_OFFSET";
+            case CL11.CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST: return "CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST";
+
 
             // CL12
             case CL12.CL_INVALID_IMAGE_DESCRIPTOR: return "CL_INVALID_IMAGE_DESCRIPTOR";
             case CL12.CL_INVALID_COMPILER_OPTIONS: return "CL_INVALID_COMPILER_OPTIONS";
             case CL12.CL_INVALID_LINKER_OPTIONS: return "CL_INVALID_LINKER_OPTIONS";
             case CL12.CL_INVALID_DEVICE_PARTITION_COUNT: return "CL_INVALID_DEVICE_PARTITION_COUNT";
+            case CL12.CL_LINK_PROGRAM_FAILURE: return "CL_LINK_PROGRAM_FAILURE";
 
             // CL20
-            case CL20.CL_INVALID_SPEC_ID: return "CL_INVALID_SPEC_ID";
-            case CL20.CL_MAX_SIZE_RESTRICTION_EXCEEDED: return "CL_MAX_SIZE_RESTRICTION_EXCEEDED";
-
-            // CL21
-            case CL21.CL_INVALID_PIPE_SIZE: return "CL_INVALID_PIPE_SIZE";
-            case CL21.CL_INVALID_DEVICE_QUEUE: return "CL_INVALID_DEVICE_QUEUE";
+            case CL20.CL_COMPILE_PROGRAM_FAILURE: return "CL_COMPILE_PROGRAM_FAILURE";
+            case CL20.CL_INVALID_PIPE_SIZE: return "CL_INVALID_PIPE_SIZE";
+            case CL20.CL_INVALID_DEVICE_QUEUE: return "CL_INVALID_DEVICE_QUEUE";
 
             // CL22
-            case CL22.CL_INVALID_SPEC_ID_KHR: return "CL_INVALID_SPEC_ID_KHR";
-            case CL22.CL_MAX_SIZE_RESTRICTION_EXCEEDED_KHR: return "CL_MAX_SIZE_RESTRICTION_EXCEEDED_KHR";
+            case CL22.CL_INVALID_SPEC_ID: return "CL_INVALID_SPEC_ID";
+            case CL22.CL_MAX_SIZE_RESTRICTION_EXCEEDED: return "CL_MAX_SIZE_RESTRICTION_EXCEEDED";
+
+            // KHR
+            case KHRGLSharing.CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR: return "CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR";
 
             default: return "Unknown OpenCL error code: " + errorCode;
         }

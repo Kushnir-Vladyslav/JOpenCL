@@ -5,16 +5,15 @@ import org.lwjgl.opencl.CL10;
 import org.lwjgl.opencl.CL20;
 import org.lwjgl.opencl.KHRPriorityHints;
 import org.lwjgl.opencl.KHRThrottleHints;
-import org.lwjgl.opencl.CLContextCallbackI;
 import org.lwjgl.opencl.KHRInitializeMemory;
 import org.lwjgl.system.MemoryStack;
 
-import javax.swing.*;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.LongPredicate;
+
+import static com.jopencl.util.OpenCLErrorUtils.*;
 
 //Options for interacting with other APIs (OpenGL, DirectX, etc.) will be added in future versions.
 //Multi-device context is not supported, to simplify high-level usage. This functionality can be implemented separately in cross-buffer and kernel implementations.
@@ -139,6 +138,8 @@ public class ContextBuilder {
     public OpenClContext create () {
         validate();
 
+        OpenCL.start();
+
         long context = 0L;
         long commandQueue = 0L;
         long deviceCommandQueue = 0L;
@@ -148,11 +149,12 @@ public class ContextBuilder {
 
             IntBuffer errCode = stack.mallocInt(1);
 
-            context = CL10.clCreateContext(contextProperties, device.getDeviceID(), (CLContextCallbackI) null, 0L, errCode);
+            context = CL10.clCreateContext(contextProperties, device.getDeviceID(), null, 0L, errCode);
 
             if (errCode.get(0) != CL10.CL_SUCCESS) {
+                OpenCL.destroy();
                 // log
-                throw new RuntimeException("clCreateContext failed with error: " + errCode.get(0));
+                throw new RuntimeException("clCreateContext failed with error: " + getCLErrorString(errCode.get(0)));
             }
 
             if(device.getOpenCLVersion().isAtLeast(CLVersion.OPENCL_2_0)) {
@@ -161,8 +163,9 @@ public class ContextBuilder {
                 commandQueue = CL20.clCreateCommandQueueWithProperties(context, device.getDeviceID(), queueProperties, errCode);
 
                 if (errCode.get(0) != CL10.CL_SUCCESS) {
+                    OpenCL.destroy();
                     // log
-                    throw new RuntimeException("clCreateContext failed with error: " + errCode.get(0));
+                    throw new RuntimeException("clCreateContext failed with error: " + getCLErrorString(errCode.get(0)));
                 }
             } else {
                 long queueProperties = 0L;
@@ -178,8 +181,9 @@ public class ContextBuilder {
 
             if (errCode.get(0) != CL10.CL_SUCCESS) {
                 CL10.clReleaseContext(context);
+                OpenCL.destroy();
                 // log
-                throw new RuntimeException("clCreateCommandQueue failed with error: " + errCode.get(0));
+                throw new RuntimeException("clCreateCommandQueue failed with error: " + getCLErrorString(errCode.get(0)));
             }
 
             if (deviceQueue && device.getOpenCLVersion().isAtLeast(CLVersion.OPENCL_2_0)) {
@@ -190,21 +194,31 @@ public class ContextBuilder {
                 if (errCode.get(0) != CL10.CL_SUCCESS || deviceCommandQueue == 0) {
                     CL10.clReleaseCommandQueue(commandQueue);
                     CL10.clReleaseContext(context);
+                    OpenCL.destroy();
                     // log
-                    throw new RuntimeException("clCreateContext failed with error: " + errCode.get(0));
+                    throw new RuntimeException("clCreateContext failed with error: " + getCLErrorString(errCode.get(0)));
                 }
             }
         }
 
         if (context == 0 || commandQueue == 0) {
+            OpenCL.destroy();
             throw new IllegalStateException("Failed to create OpenCL context or command queue.");
         }
 
-        //OpenClContext openClContext = new OpenClContext(context, commandQueue, deviceCommandQueue, ...);
-        //EventManager.getInstance().registrationContext(openClContext);
-        //return openClContext;
+        OpenClContext contextCL = new OpenClContext(
+                platform,
+                device,
+                outOfOrder,
+                context,
+                commandQueue,
+                deviceCommandQueue,
+                deviceQueueSize
+        );
 
-        return null;
+        OpenCL.registrationContext(contextCL);
+
+        return contextCL;
     }
 
     private void validate() {
@@ -245,13 +259,20 @@ public class ContextBuilder {
             queueProperties |= CL10.CL_QUEUE_PROFILING_ENABLE;
         }
 
-        properties.add(queueProperties);
+        if (queueProperties != 0L) {
+            properties.add((long) CL20.CL_QUEUE_PROPERTIES);
+            properties.add(queueProperties);
+        }
 
-        properties.add((long) KHRPriorityHints.CL_QUEUE_PRIORITY_KHR);
-        properties.add(priority);
+        if (device.supportsExtension("cl_khr_priority_hints")) {
+            properties.add((long) KHRPriorityHints.CL_QUEUE_PRIORITY_KHR);
+            properties.add(priority);
+        }
 
-        properties.add((long) KHRThrottleHints.CL_QUEUE_THROTTLE_KHR);
-        properties.add(energyConsumption);
+        if (device.supportsExtension("cl_khr_throttle_hints")) {
+            properties.add((long) KHRThrottleHints.CL_QUEUE_THROTTLE_KHR);
+            properties.add(energyConsumption);
+        }
 
         properties.add(0L);
 
@@ -274,13 +295,18 @@ public class ContextBuilder {
             queueProperties |= CL10.CL_QUEUE_PROFILING_ENABLE;
         }
 
+        properties.add((long) CL20.CL_QUEUE_PROPERTIES);
         properties.add(queueProperties);
 
-        properties.add((long) KHRPriorityHints.CL_QUEUE_PRIORITY_KHR);
-        properties.add(priority);
+        if (device.supportsExtension("cl_khr_priority_hints")) {
+            properties.add((long) KHRPriorityHints.CL_QUEUE_PRIORITY_KHR);
+            properties.add(priority);
+        }
 
-        properties.add((long) KHRThrottleHints.CL_QUEUE_THROTTLE_KHR);
-        properties.add(energyConsumption);
+        if (device.supportsExtension("cl_khr_throttle_hints")) {
+            properties.add((long) KHRThrottleHints.CL_QUEUE_THROTTLE_KHR);
+            properties.add(energyConsumption);
+        }
 
         properties.add((long) CL20.CL_QUEUE_SIZE);
         properties.add(deviceQueueSize);
