@@ -1,8 +1,24 @@
 package com.jopencl.util;
 
+import com.jopencl.exceptions.ContextCreationException;
+import com.jopencl.exceptions.DeviceNotFoundException;
+import com.jopencl.exceptions.OpenCLException;
+import com.jopencl.exceptions.ResourceAllocationException;
 import org.lwjgl.opencl.*;
 
+/**
+ * Utility class for OpenCL error handling and error code translation.
+ * Provides human-readable descriptions for OpenCL error codes from different OpenCL versions
+ * and extensions.
+ */
 public class OpenCLErrorUtils {
+    /**
+     * Converts an OpenCL error code to its corresponding string representation.
+     * Supports error codes from OpenCL 1.0 through 2.2 and some KHR extensions.
+     *
+     * @param errorCode the OpenCL error code to convert
+     * @return a human-readable string describing the error
+     */
     public static String getCLErrorString(int errorCode) {
         switch (errorCode) {
             // CL10
@@ -80,6 +96,50 @@ public class OpenCLErrorUtils {
             case KHRGLSharing.CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR: return "CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR";
 
             default: return "Unknown OpenCL error code: " + errorCode;
+        }
+    }
+
+
+    /**
+     * Checks if the given OpenCL error code indicates success.
+     *
+     * @param errorCode the OpenCL error code to check
+     * @return true if the operation was successful, false otherwise
+     */
+    public static boolean isSuccess(int errorCode) {
+        return errorCode == CL10.CL_SUCCESS;
+    }
+
+    /**
+     * Throws appropriate exception based on the OpenCL error code if the operation failed.
+     *
+     * @param errorCode the OpenCL error code to check
+     * @param operation description of the operation that was attempted
+     * @throws OpenCLException if the operation failed
+     */
+    public static void checkError(int errorCode, String operation) {
+        if (!isSuccess(errorCode)) {
+            String errorString = getCLErrorString(errorCode);
+            String message = String.format("%s failed: %s", operation, errorString);
+
+            switch (errorCode) {
+                case CL10.CL_DEVICE_NOT_FOUND:
+                case CL10.CL_DEVICE_NOT_AVAILABLE:
+                    throw new DeviceNotFoundException(message);
+
+                case CL10.CL_INVALID_CONTEXT:
+                case CL10.CL_INVALID_VALUE:
+                case CL10.CL_INVALID_DEVICE:
+                    throw new ContextCreationException(message, errorCode);
+
+                case CL10.CL_MEM_OBJECT_ALLOCATION_FAILURE:
+                case CL10.CL_OUT_OF_RESOURCES:
+                case CL10.CL_OUT_OF_HOST_MEMORY:
+                    throw new ResourceAllocationException(message, errorCode);
+
+                default:
+                    throw new OpenCLException(message);
+            }
         }
     }
 }

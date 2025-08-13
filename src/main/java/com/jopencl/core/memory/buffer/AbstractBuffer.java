@@ -209,7 +209,7 @@ public abstract class AbstractBuffer {
 
     private void registerWithContext() {
         try {
-            openClContext.bufferManager.registerBuffer(this);
+            openClContext.getBufferManager().registerBuffer(this);
         } catch (Exception e) {
             throwInitError("Failed to register buffer with context: " + e.getMessage());
         }
@@ -298,9 +298,9 @@ public abstract class AbstractBuffer {
             }
         }
 
-        if (openClContext != null && openClContext.bufferManager != null) {
+        if (openClContext != null && openClContext.getBufferManager() != null) {
             try {
-                openClContext.bufferManager.remove(this);
+                openClContext.getBufferManager().remove(this);
             } catch (Exception e) {
                 logger.error("Error removing buffer '{}' from context", bufferName, e);
             }

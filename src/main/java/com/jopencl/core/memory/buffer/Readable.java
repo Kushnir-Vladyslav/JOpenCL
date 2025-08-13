@@ -220,7 +220,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                     len, buffer.getBufferName(), offset);
 
             int errorCode = CL10.clEnqueueReadBuffer(
-                    buffer.openClContext.commandQueue,
+                    buffer.openClContext.getCommandQueue(),
                     buffer.clBuffer,
                     true,
                     offset * data.getSizeStruct(),
@@ -377,7 +377,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                     tempNativeBuffer.capacity(), buffer.getBufferName(), offset);
 
             int errorCode = CL10.clEnqueueReadBuffer(
-                    buffer.openClContext.commandQueue,
+                    buffer.openClContext.getCommandQueue(),
                     buffer.clBuffer,
                     true,
                     offset * data.getSizeStruct(),
