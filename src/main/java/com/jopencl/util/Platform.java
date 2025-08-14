@@ -177,169 +177,418 @@ public class Platform {
         }
     }
 
+    /**
+     * Gets a long value for the specified platform info parameter.
+     *
+     * @param param the parameter to query
+     * @return the long value, or -1 if the query fails
+     * @throws OpenCLException if the platform query fails
+     */
     private long getLong(int param) {
+        logger.debug("Querying long parameter: {}", param);
         try (MemoryStack stack = stackPush()) {
             LongBuffer buf = stack.mallocLong(1);
             int result = clGetPlatformInfo(platformID, param, buf, null);
             if (result != CL_SUCCESS) {
-                //log
+                logger.warn("Failed to get long parameter {}: {} ({})", param,
+                        OpenCLErrorUtils.getCLErrorString(result), result);
                 return -1;
             }
-            return buf.get(0);
+            long value = buf.get(0);
+            logger.debug("Retrieved long parameter {}: {}", param, value);
+            return value;
+        } catch (Exception e) {
+            logger.error("Exception while querying long parameter {}", param, e);
+            throw new OpenCLException("Failed to retrieve long platform parameter", e);
         }
     }
 
+    /**
+     * Creates Device instances from a list of device IDs.
+     *
+     * @param devicesID list of device IDs to convert
+     * @return unmodifiable list of Device instances
+     * @throws OpenCLException if device creation fails
+     */
     private List<Device> getDeviceDirect(List<Long> devicesID) {
+        logger.debug("Creating {} device instances", devicesID.size());
         List<Device> deviceList = new ArrayList<>();
-        for (Long deviceID : devicesID) {
-            deviceList.add(new Device(this, deviceID));
+        try {
+            for (Long deviceID : devicesID) {
+                logger.trace("Creating device instance for ID: {}", deviceID);
+                deviceList.add(new Device(this, deviceID));
+            }
+            logger.debug("Successfully created {} device instances", deviceList.size());
+            return Collections.unmodifiableList(deviceList);
+        } catch (Exception e) {
+            logger.error("Failed to create device instances", e);
+            throw new OpenCLException("Failed to create device instances", e);
         }
-        return Collections.unmodifiableList(deviceList);
     }
 
+    /**
+     * Retrieves device IDs for the specified device type.
+     *
+     * @param deviceType the OpenCL device type constant
+     * @return list of device IDs, empty if none found or query fails
+     * @throws OpenCLException if the device query encounters an unexpected error
+     */
     private List<Long> getDeviceIDs(int deviceType) {
-        IntBuffer numDevices = BufferUtils.createIntBuffer(1);
-        int result = clGetDeviceIDs(platformID, deviceType, null, numDevices);
+        logger.debug("Querying device IDs for type: {}", deviceType);
+        try {
+            IntBuffer numDevices = BufferUtils.createIntBuffer(1);
+            int result = clGetDeviceIDs(platformID, deviceType, null, numDevices);
 
-        if (result != CL_SUCCESS || numDevices.get(0) == 0) {
-            return new ArrayList<>();
+            if (result == CL_DEVICE_NOT_FOUND) {
+                logger.debug("No devices found for type: {}", deviceType);
+                return new ArrayList<>();
+            }
+
+            if (result == CL_SUCCESS || numDevices.get(0) == 0) {
+                logger.warn("Device query failed for type {}: {} ({})", deviceType,
+                        OpenCLErrorUtils.getCLErrorString(result), result);
+                return new ArrayList<>();
+            }
+
+            int deviceCount = numDevices.get(0);
+            logger.debug("Found {} devices for type: {}", deviceCount, deviceType);
+
+            PointerBuffer devices = BufferUtils.createPointerBuffer(deviceCount);
+            result = clGetDeviceIDs(platformID, deviceType, devices, (IntBuffer) null);
+
+            if (result != CL_SUCCESS) {
+                logger.warn("Failed to retrieve device IDs for type {}: {} ({})", deviceType,
+                        OpenCLErrorUtils.getCLErrorString(result), result);
+                return new ArrayList<>();
+            }
+
+            List<Long> deviceList = new ArrayList<>();
+            for (int i = 0; i < devices.capacity(); i++) {
+                long deviceID = devices.get(i);
+                deviceList.add(deviceID);
+                logger.trace("Found device ID: {}", deviceID);
+            }
+
+            logger.debug("Successfully retrieved {} device IDs for type: {}", deviceList.size(), deviceType);
+            return deviceList;
+        } catch (Exception e) {
+            logger.error("Exception while querying device IDs for type: {}", deviceType, e);
+            throw new OpenCLException("Failed to query device IDs", e);
         }
-
-        PointerBuffer devices = BufferUtils.createPointerBuffer(numDevices.get(0));
-        result = clGetDeviceIDs(platformID, deviceType, devices, (IntBuffer) null);
-
-        if (result != CL_SUCCESS) {
-            return new ArrayList<>();
-        }
-
-        List<Long> deviceList = new ArrayList<>();
-        for (int i = 0; i < devices.capacity(); i++) {
-            deviceList.add(devices.get(i));
-        }
-        return deviceList;
     }
 
+    /**
+     * Gets the count of devices for the specified device type.
+     *
+     * @param deviceType the OpenCL device type constant
+     * @return number of devices, 0 if none found or query fails
+     */
     private int getDeviceCountDirect(int deviceType) {
-        IntBuffer numDevices = BufferUtils.createIntBuffer(1);
-        int result = clGetDeviceIDs(platformID, deviceType, null, numDevices);
-        return (result == CL_SUCCESS) ? numDevices.get(0) : 0;
+        logger.debug("Counting devices for type: {}", deviceType);
+        try {
+            IntBuffer numDevices = BufferUtils.createIntBuffer(1);
+            int result = clGetDeviceIDs(platformID, deviceType, null, numDevices);
+
+            if (result == CL_DEVICE_NOT_FOUND) {
+                logger.debug("No devices found for type: {}", deviceType);
+                return 0;
+            }
+
+            if (result != CL_SUCCESS) {
+                logger.warn("Device count query failed for type {}: {} ({})", deviceType,
+                        OpenCLErrorUtils.getCLErrorString(result), result);
+                return 0;
+            }
+
+            int count = numDevices.get(0);
+            logger.debug("Device count for type {}: {}", deviceType, count);
+            return count;
+        }  catch (Exception e) {
+            logger.error("Exception while counting devices for type: {}", deviceType, e);
+            return 0;
+        }
     }
 
     // ========== PUBLIC GETTERS (now return cached values) ==========
 
+    /**
+     * Returns the platform name.
+     *
+     * @return the platform name
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * Returns the platform vendor.
+     *
+     * @return the platform vendor
+     */
     public String getVendor() {
         return vendor;
     }
 
+    /**
+     * Returns the platform version string.
+     *
+     * @return the platform version string
+     */
     public String getPlatformVersion() {
         return platformVersion;
     }
 
+    /**
+     * Returns the parsed OpenCL version for this platform.
+     *
+     * @return the OpenCL version
+     */
     public CLVersion getOpenCLVersion() {
         return versionCL;
     }
 
+    /**
+     * Returns the platform profile (FULL_PROFILE or EMBEDDED_PROFILE).
+     *
+     * @return the platform profile
+     */
     public String getProfile() {
         return profile;
     }
 
+    /**
+     * Returns a copy of the platform extensions array.
+     *
+     * @return array of extension names, empty array if no extensions
+     */
     public String[] getExtensions() {
         return extensions.clone(); // Return copy to prevent modification
     }
 
+    /**
+     * Returns the host timer resolution in nanoseconds.
+     * Only available for OpenCL 2.1 and later.
+     *
+     * @return host timer resolution in nanoseconds, or -1 if not available
+     */
     public long getHostTimerResolution() {
         return hostTimerResolution;
     }
 
+    /**
+     * Returns the OpenCL platform ID.
+     *
+     * @return the platform ID
+     */
     public long getPlatformID() {
         return platformID;
     }
 
     // ========== DEVICE METHODS (now return cached values) ==========
 
+    /**
+     * Returns a list of all available devices on this platform.
+     *
+     * @return list of all devices
+     */
     public List<Device> getAllDevices() {
         return new ArrayList<>(allDevices);
     }
 
+    /**
+     * Returns a list of CPU devices available on this platform.
+     *
+     * @return list of CPU devices
+     */
     public List<Device> getCPUDevices() {
         return new ArrayList<>(cpuDevices);
     }
 
+    /**
+     * Returns a list of GPU devices available on this platform.
+     *
+     * @return list of GPU devices
+     */
     public List<Device> getGPUDevices() {
         return new ArrayList<>(gpuDevices);
     }
 
+    /**
+     * Returns a list of accelerator devices available on this platform.
+     *
+     * @return list of accelerator devices
+     */
     public List<Device> getAcceleratorDevices() {
         return new ArrayList<>(acceleratorDevices);
     }
 
-    // Device counts (cached)
+    /**
+     * Returns the total number of devices on this platform.
+     *
+     * @return total device count
+     */
     public int getTotalDeviceCount() {
         return totalDeviceCount;
     }
 
+    /**
+     * Returns the number of CPU devices on this platform.
+     *
+     * @return CPU device count
+     */
     public int getCPUDeviceCount() {
         return cpuDeviceCount;
     }
 
+    /**
+     * Returns the number of GPU devices on this platform.
+     *
+     * @return GPU device count
+     */
     public int getGPUDeviceCount() {
         return gpuDeviceCount;
     }
 
+    /**
+     * Returns the number of accelerator devices on this platform.
+     *
+     * @return accelerator device count
+     */
     public int getAcceleratorDeviceCount() {
         return acceleratorDeviceCount;
     }
 
     // ========== UTILITY METHODS ==========
 
+    /**
+     * Checks if this platform has any GPU devices.
+     *
+     * @return true if GPU devices are available, false otherwise
+     */
     public boolean hasGPUDevices() {
         return gpuDeviceCount > 0;
     }
 
+    /**
+     * Checks if this platform has any CPU devices.
+     *
+     * @return true if CPU devices are available, false otherwise
+     */
     public boolean hasCPUDevices() {
         return cpuDeviceCount > 0;
     }
 
+    /**
+     * Checks if this platform has any accelerator devices.
+     *
+     * @return true if accelerator devices are available, false otherwise
+     */
     public boolean hasAcceleratorDevices() {
         return acceleratorDeviceCount > 0;
     }
 
+    /**
+     * Checks if this platform supports OpenCL 2.1 or later.
+     *
+     * @return true if OpenCL 2.1+ is supported, false otherwise
+     */
     public boolean supportsOpenCL21() {
         return versionCL.isAtLeast(versionCL.OPENCL_2_1);
     }
 
+    /**
+     * Checks if the platform supports a specific extension.
+     *
+     * @param extensionName the name of the extension to check
+     * @return true if the extension is supported, false otherwise
+     * @throws IllegalArgumentException if extensionName is null or empty
+     */
     public boolean supportsExtension(String extensionName) {
+        if (extensionName == null || extensionName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Extension name cannot be null or empty");
+        }
+
+        logger.trace("Checking support for extension: {}", extensionName);
         for (String ext : extensions) {
             if (ext.equals(extensionName)) {
+                logger.trace("Extension {} is supported", extensionName);
                 return true;
             }
         }
+        logger.trace("Extension {} is not supported", extensionName);
         return false;
     }
 
+    /**
+     * Returns the first (typically best) GPU device on this platform.
+     *
+     * @return the best GPU device, or null if no GPU devices are available
+     */
     public Device getBestGPUDevice() {
-        return gpuDevices.isEmpty() ? null : gpuDevices.get(0);
+        if (gpuDevices.isEmpty()) {
+            logger.debug("No GPU devices available");
+            return null;
+        }
+        Device bestGPU = gpuDevices.get(0);
+        logger.debug("Best GPU device: {}", bestGPU.getName());
+        return bestGPU;
     }
 
+    /**
+     * Returns the best available device on this platform.
+     * Priority order: GPU > CPU > Accelerator.
+     *
+     * @return the best device, or null if no devices are available
+     */
     public Device getBestDevice() {
         // Priority: GPU > CPU > Accelerator
-        if (!gpuDevices.isEmpty()) return gpuDevices.get(0);
-        if (!cpuDevices.isEmpty()) return cpuDevices.get(0);
-        if (!acceleratorDevices.isEmpty()) return acceleratorDevices.get(0);
+        if (!gpuDevices.isEmpty()) {
+            Device best = gpuDevices.get(0);
+            logger.debug("Best device selected: GPU - {}", best.getName());
+            return best;
+        }
+        if (!cpuDevices.isEmpty()) {
+            Device best = cpuDevices.get(0);
+            logger.debug("Best device selected: CPU - {}", best.getName());
+            return best;
+        }
+        if (!acceleratorDevices.isEmpty()) {
+            Device best = acceleratorDevices.get(0);
+            logger.debug("Best device selected: Accelerator - {}", best.getName());
+            return best;
+        }
+
+        logger.warn("No devices available on platform");
         return null;
     }
 
+    /**
+     * Checks if the specified device belongs to this platform.
+     *
+     * @param device the device to check
+     * @return true if the device belongs to this platform, false otherwise
+     * @throws IllegalArgumentException if device is null
+     */
     public boolean owns(Device device) {
-        return allDevices.contains(device);
+        if (device == null) {
+            throw new IllegalArgumentException("Device cannot be null");
+        }
+
+        boolean owns = allDevices.contains(device);
+        logger.trace("Platform {} device: {}", owns ? "owns" : "does not own", device.getName());
+        return owns;
     }
 
     // ========== INFORMATION DISPLAY ==========
 
+    /**
+     * Returns a formatted summary of devices on this platform.
+     *
+     * @return device summary string
+     */
     public String getDeviceSummary() {
+        logger.trace("Generating device summary");
+
         StringBuilder sb = new StringBuilder();
         sb.append("Devices on platform:\n");
 
@@ -354,7 +603,14 @@ public class Platform {
         return sb.toString();
     }
 
+    /**
+     * Returns a formatted summary of platform extensions.
+     *
+     * @return extension summary string
+     */
     public String getExtensionSummary() {
+        logger.trace("Generating extension summary");
+
         if (extensions.length == 0) {
             return "Extensions: none";
         }
@@ -367,8 +623,15 @@ public class Platform {
         return sb.toString();
     }
 
+    /**
+     * Returns a comprehensive string representation of this platform.
+     *
+     * @return formatted platform information
+     */
     @Override
     public String toString() {
+        logger.trace("Generating platform string representation");
+
         StringBuilder sb = new StringBuilder();
         sb.append("=== OpenCL Platform ===\n");
         sb.append("Name: ").append(getName()).append("\n");
