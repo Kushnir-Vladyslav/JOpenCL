@@ -188,7 +188,7 @@ public abstract class AbstractGlobalBuffer
 
         IntBuffer errorCode = MemoryUtil.memAllocInt(1);
         long newClBuffer = CL10.clCreateBuffer(
-                openClContext.context,
+                openClContext.getContext(),
                 flags,
                 capacity * dataObject.getSizeStruct(),
                 errorCode

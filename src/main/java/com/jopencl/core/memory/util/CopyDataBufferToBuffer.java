@@ -71,7 +71,7 @@ public class CopyDataBufferToBuffer {
                 size, src.getBufferName(), dst.getBufferName(), srcOffset, dstOffset);
 
         return CL10.clEnqueueCopyBuffer(
-                openClContext.commandQueue,
+                openClContext.getCommandQueue(),
                 src.getClBuffer(),
                 dst.getClBuffer(),
                 srcOffset,
@@ -138,7 +138,7 @@ public class CopyDataBufferToBuffer {
                 size, src, dst, srcOffset, dstOffset);
 
         return CL10.clEnqueueCopyBuffer(
-                openClContext.commandQueue,
+                openClContext.getCommandQueue(),
                 src,
                 dst,
                 srcOffset,

@@ -112,7 +112,7 @@ public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
                     arrSize, buffer.getBufferName(), offset);
 
             int errorCode = CL10.clEnqueueWriteBuffer(
-                    buffer.openClContext.commandQueue,
+                    buffer.openClContext.getCommandQueue(),
                     buffer.clBuffer,
                     true,
                     offset * dataSize,
