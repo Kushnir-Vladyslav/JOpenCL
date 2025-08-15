@@ -18,6 +18,7 @@ package io.github.kushnirvladyslav.memory.buffer;
 
 import io.github.kushnirvladyslav.memory.data.Data;
 import io.github.kushnirvladyslav.OpenClContext;
+import io.github.kushnirvladyslav.util.StatusCL;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,7 @@ public abstract class AbstractBuffer {
     private static final Logger logger = LoggerFactory.getLogger(AbstractBuffer.class);
     private static final AtomicInteger counter = new AtomicInteger(0);
 
-    private boolean initiated = false;
+    private StatusCL status = StatusCL.READY;
 
     private String bufferName;
 
@@ -67,7 +68,7 @@ public abstract class AbstractBuffer {
      * Creates a new AbstractBuffer instance with a default name.
      */
     protected AbstractBuffer () {
-        this.bufferName  = "UnnamedBuffer" + counter.getAndIncrement();
+        this.bufferName  = "UnnamedBuffer " + counter.getAndIncrement();
     }
 
     /**
@@ -75,8 +76,9 @@ public abstract class AbstractBuffer {
      *
      * @throws IllegalStateException if the buffer has already been initiated
      */
-    protected void initCheck () {
-        if (initiated) {
+    protected void readyForInit () {
+        checkIsNotDestroy();
+        if (!isReady()) {
             String message = String.format("Buffer '%s' has already been initiated", bufferName);
             logger.error(message);
             throw new IllegalStateException(message);
@@ -92,7 +94,7 @@ public abstract class AbstractBuffer {
      * @throws IllegalArgumentException if the name is null or empty
      */
     public AbstractBuffer setBufferName(String name) {
-        initCheck();
+        readyForInit();
         if (name == null || name.trim().isEmpty()) {
             String message = "Buffer name cannot be null or empty";
             logger.error(message);
@@ -112,7 +114,7 @@ public abstract class AbstractBuffer {
      * @throws IllegalArgumentException if the context is null
      */
     public AbstractBuffer setOpenClContext(OpenClContext clContext) {
-        initCheck();
+        readyForInit();
         if (clContext == null) {
             String message = String.format("OpenCL context cannot be null for buffer '%s'", bufferName);
             logger.error(message);
@@ -132,7 +134,7 @@ public abstract class AbstractBuffer {
      * @throws IllegalArgumentException if the size is not positive
      */
     public AbstractBuffer setInitSize(int newSize) {
-        initCheck();
+        readyForInit();
         if (newSize <= 0) {
             String message = String.format("Buffer size must be positive, got %d for buffer '%s'", newSize, bufferName);
             logger.error(message);
@@ -153,7 +155,7 @@ public abstract class AbstractBuffer {
      * @throws IllegalArgumentException if the class is null
      */
     public <T extends Data> AbstractBuffer setDataClass(Class<T> newClass) {
-        initCheck();
+        readyForInit();
         if (newClass == null) {
             String message = String.format("Data class cannot be null for buffer '%s'", bufferName);
             logger.error(message);
@@ -170,7 +172,7 @@ public abstract class AbstractBuffer {
      * @throws IllegalStateException if any required settings are missing or invalid
      */
     public final void init() {
-        initCheck();
+        readyForInit();
         logger.info("Initializing buffer '{}'", bufferName);
 
         validateInitialization();
@@ -190,7 +192,7 @@ public abstract class AbstractBuffer {
                 }
             }
 
-            initiated = true;
+            setStatus(StatusCL.RUNNING);
             logger.info("Successfully initialized buffer '{}'", bufferName);
         } catch (Exception e) {
             String message = String.format("Failed to initialize buffer '%s'", bufferName);
@@ -251,16 +253,8 @@ public abstract class AbstractBuffer {
      * @return the buffer name
      */
     public String getBufferName () {
+        checkIsNotDestroy();
         return bufferName;
-    }
-
-    /**
-     * Checks if this buffer has been initialized.
-     *
-     * @return true if the buffer is initialized, false otherwise
-     */
-    public boolean isInitialized() {
-        return initiated;
     }
 
     /**
@@ -269,6 +263,7 @@ public abstract class AbstractBuffer {
      * @return the buffer capacity
      */
     public int getCapacity() {
+        checkIsNotDestroy();
         return capacity;
     }
 
@@ -286,21 +281,49 @@ public abstract class AbstractBuffer {
      * This method is idempotent and can be called multiple times safely.
      */
     public void destroy () {
-        if (initiated) {
-            logger.info("Destroying buffer '{}'", bufferName);
+        checkIsNotDestroy();
 
-            if (this instanceof AdditionalLifecycle) {
-                AdditionalLifecycle additionalLifecycle = (AdditionalLifecycle) this;
-                try {
-                    additionalLifecycle.additionalCleanup();
-                } catch (Exception e) {
-                    logger.error("Error during additional cleanup for buffer '{}'", bufferName, e);
-                }
+        logger.info("Destroying buffer '{}'", bufferName);
+
+        if (this instanceof AdditionalLifecycle) {
+            AdditionalLifecycle additionalLifecycle = (AdditionalLifecycle) this;
+            try {
+                additionalLifecycle.additionalCleanup();
+            } catch (Exception e) {
+                logger.error("Error during additional cleanup for buffer '{}'", bufferName, e);
             }
+        }
 
-            cleanup();
-            initiated = false;
-            logger.info("Buffer '{}' destroyed", bufferName);
+        cleanup();
+        setStatus(StatusCL.CLOSED);
+        logger.info("Buffer '{}' destroyed", bufferName);
+
+    }
+
+    public boolean isReady() {
+        return status == StatusCL.READY;
+    }
+
+    public boolean isRunning() {
+        return status == StatusCL.RUNNING;
+    }
+
+    public boolean isClosed() {
+        return status == StatusCL.CLOSED;
+    }
+
+    private void setStatus(StatusCL newStatus) {
+        if (newStatus == null) {
+            //log
+            //throw
+        }
+
+        status = newStatus;
+    }
+
+    protected void checkIsNotDestroy () {
+        if (isClosed()) {
+            throw new IllegalStateException("");
         }
     }
 

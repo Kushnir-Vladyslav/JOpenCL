@@ -57,7 +57,7 @@ public class BufferManager {
      * @param buffer the buffer to register
      * @throws IllegalArgumentException if the buffer is null
      */
-    public void registerBuffer(AbstractBuffer buffer) {
+    void registerBuffer(AbstractBuffer buffer) {
         if (buffer == null) {
             String message = "Cannot register null buffer";
             logger.error(message);
@@ -120,28 +120,6 @@ public class BufferManager {
         }
         logger.debug("Removing buffer '{}'", buffer.getBufferName());
         buffers.remove(buffer);
-    }
-
-    /**
-     * Removes a buffer from management by its name without destroying it.
-     *
-     * @param bufferName the name of the buffer to remove
-     * @throws IllegalArgumentException if bufferName is null or empty
-     */
-    public void remove (String bufferName) {
-        if (bufferName == null || bufferName.trim().isEmpty()) {
-            String message = "Buffer name cannot be null or empty";
-            logger.error(message);
-            throw new IllegalArgumentException(message);
-        }
-
-        AbstractBuffer buffer = getBuffer(bufferName);
-        if (buffer != null) {
-            logger.debug("Removing buffer '{}'", bufferName);
-            buffers.remove(buffer);
-        } else {
-            logger.warn("Cannot remove buffer '{}': not found in buffer manager", bufferName);
-        }
     }
 
     /**

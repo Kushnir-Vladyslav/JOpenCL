@@ -74,7 +74,7 @@ public abstract class AbstractGlobalBuffer
      * @throws IllegalStateException if the buffer has already been initiated
      */
     public AbstractBuffer setFlags(long newFlags) {
-        initCheck();
+        readyForInit();
         logger.debug("Setting OpenCL memory flags to {} for buffer '{}'", newFlags, getBufferName());
         flags = newFlags;
 
@@ -89,7 +89,7 @@ public abstract class AbstractGlobalBuffer
      * @throws IllegalStateException if the buffer has already been initiated
      */
     public AbstractBuffer setCopyHostBuffer(boolean isProjection) {
-        initCheck();
+        readyForInit();
         logger.debug("Setting copyHostBuffer to {} for buffer '{}'", isProjection, getBufferName());
         copyHostBuffer = isProjection;
 
@@ -104,7 +104,7 @@ public abstract class AbstractGlobalBuffer
      * @throws IllegalStateException if the buffer has already been initiated
      */
     public AbstractBuffer setCopyNativeBuffer(boolean copyNativeBuffer) {
-        initCheck();
+        readyForInit();
         logger.debug("Setting copyNativeBuffer to {} for buffer '{}'", copyNativeBuffer, getBufferName());
         this.copyNativeBuffer = copyNativeBuffer;
         return this;
