@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Have fixed size after initialization</li>
  *   <li>Use CL_MEM_READ_WRITE flag for full access</li>
  *   <li>Prevent reading operations for better performance</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Kushnir-Vladyslav

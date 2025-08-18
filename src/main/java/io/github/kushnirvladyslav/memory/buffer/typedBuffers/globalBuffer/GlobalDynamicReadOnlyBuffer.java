@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Prevent writing from the device</li>
  *   <li>Use CL_MEM_READ_WRITE flag for full access</li>
  *   <li>Support automatic resizing</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Vladyslav Kushnir

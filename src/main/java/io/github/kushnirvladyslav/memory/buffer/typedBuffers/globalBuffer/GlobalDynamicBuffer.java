@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Maintain a minimum capacity</li>
  *   <li>Increase capacity by 50% when resizing</li>
  *   <li>Ensure thread-safe resizing operations</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Vladyslav Kushnir
@@ -48,11 +48,11 @@ public class GlobalDynamicBuffer
      */
     public GlobalDynamicBuffer () {
         logger.debug("Creating new GlobalDynamicBuffer instance with minimum capacity");
-        setInitSize(getMinCapacity());
+        withInitSize(getMinCapacity());
     }
 
     @Override
-    public AbstractBuffer setInitSize(int newSize) {
+    public AbstractBuffer withInitSize(int newSize) {
         initCheck();
         if (newSize < getMinCapacity()) {
             String message = String.format("Buffer size must be positive, got %d for buffer '%s'", newSize, getBufferName());

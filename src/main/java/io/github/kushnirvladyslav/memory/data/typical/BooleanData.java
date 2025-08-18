@@ -33,9 +33,9 @@ import java.util.Arrays;
  *
  * <p>This class provides conversion and buffer management for boolean data,
  * supporting both primitive and boxed types. Boolean values are stored as bytes
- * where 0 represents false and 1 represents true.</p>
+ * where 0 represents false and 1 represents true.
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>
  * BooleanData booleanData = new BooleanData();
  *

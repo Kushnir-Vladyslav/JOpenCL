@@ -16,6 +16,8 @@
 
 package io.github.kushnirvladyslav.memory.buffer;
 
+import io.github.kushnirvladyslav.exceptions.BufferDestructionException;
+import io.github.kushnirvladyslav.exceptions.BufferInitializationException;
 import io.github.kushnirvladyslav.memory.data.Data;
 import io.github.kushnirvladyslav.OpenClContext;
 import io.github.kushnirvladyslav.util.StatusCL;
@@ -32,15 +34,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>This class implements a builder pattern for buffer configuration and ensures proper
  * resource cleanup. All buffer implementations should extend this class and implement
- * specific buffer operations.</p>
+ * specific buffer operations.
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>
  * AbstractBuffer buffer = new ConcreteBuffer()
- *     .setBufferName("MyBuffer")
- *     .setDataClass(FloatData.class)
- *     .setInitSize(1024)
- *     .setOpenClContext(context)
+ *     .withBufferName("MyBuffer")
+ *     .withDataClass(FloatData.class)
+ *     .withInitSize(1024)
+ *     .withOpenClContext(context)
  *     .init();
  * </pre>
  *
@@ -56,7 +58,7 @@ public abstract class AbstractBuffer {
     private String bufferName;
 
     private Class<?> clazz = null;
-    protected OpenClContext openClContext;
+    protected OpenClContext context;
 
     protected Data dataObject;
 
@@ -74,7 +76,8 @@ public abstract class AbstractBuffer {
     /**
      * Checks if the buffer has already been initiated.
      *
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
+     * @throws BufferDestructionException if the buffer has been closed
      */
     protected void readyForInit () {
         checkIsNotDestroy();
@@ -90,10 +93,11 @@ public abstract class AbstractBuffer {
      *
      * @param name the name to set for the buffer
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
      * @throws IllegalArgumentException if the name is null or empty
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public AbstractBuffer setBufferName(String name) {
+    public AbstractBuffer withBufferName(String name) {
         readyForInit();
         if (name == null || name.trim().isEmpty()) {
             String message = "Buffer name cannot be null or empty";
@@ -110,10 +114,11 @@ public abstract class AbstractBuffer {
      *
      * @param clContext the OpenCL context to use
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
      * @throws IllegalArgumentException if the context is null
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public AbstractBuffer setOpenClContext(OpenClContext clContext) {
+    public AbstractBuffer withOpenClContext(OpenClContext clContext) {
         readyForInit();
         if (clContext == null) {
             String message = String.format("OpenCL context cannot be null for buffer '%s'", bufferName);
@@ -121,7 +126,7 @@ public abstract class AbstractBuffer {
             throw new IllegalArgumentException(message);
         }
         logger.debug("Setting OpenCL context for buffer '{}'", bufferName);
-        this.openClContext = clContext;
+        this.context = clContext;
         return this;
     }
 
@@ -130,10 +135,11 @@ public abstract class AbstractBuffer {
      *
      * @param newSize the size to initialize the buffer with
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
      * @throws IllegalArgumentException if the size is not positive
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public AbstractBuffer setInitSize(int newSize) {
+    public AbstractBuffer withInitSize(int newSize) {
         readyForInit();
         if (newSize <= 0) {
             String message = String.format("Buffer size must be positive, got %d for buffer '%s'", newSize, bufferName);
@@ -151,10 +157,11 @@ public abstract class AbstractBuffer {
      * @param <T> the type of data
      * @param newClass the class of data to be stored in the buffer
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
      * @throws IllegalArgumentException if the class is null
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public <T extends Data> AbstractBuffer setDataClass(Class<T> newClass) {
+    public <T extends Data> AbstractBuffer withDataClass(Class<T> newClass) {
         readyForInit();
         if (newClass == null) {
             String message = String.format("Data class cannot be null for buffer '%s'", bufferName);
@@ -169,7 +176,8 @@ public abstract class AbstractBuffer {
     /**
      * Initializes the buffer with the configured settings.
      *
-     * @throws IllegalStateException if any required settings are missing or invalid
+     * @throws BufferInitializationException if any required settings are missing or invalid
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public final void init() {
         readyForInit();
@@ -212,7 +220,7 @@ public abstract class AbstractBuffer {
         if (capacity < 1) {
             throwInitError("Buffer size must be positive");
         }
-        if (openClContext == null) {
+        if (context == null) {
             throwInitError("OpenCL context must be set");
         }
     }
@@ -227,7 +235,7 @@ public abstract class AbstractBuffer {
 
     private void registerWithContext() {
         try {
-            openClContext.getBufferManager().registerBuffer(this);
+            context.getBufferManager().registerBuffer(this);
         } catch (Exception e) {
             throwInitError("Failed to register buffer with context: " + e.getMessage());
         }
@@ -236,7 +244,7 @@ public abstract class AbstractBuffer {
     protected void throwInitError(String message) {
         String fullMessage = String.format("Initialization error for buffer '%s': %s", bufferName, message);
         logger.error(fullMessage);
-        throw new IllegalStateException(fullMessage);
+        throw new BufferInitializationException(fullMessage);
     }
 
     /**
@@ -251,6 +259,7 @@ public abstract class AbstractBuffer {
      * Gets the name of the buffer.
      *
      * @return the buffer name
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public String getBufferName () {
         checkIsNotDestroy();
@@ -261,6 +270,7 @@ public abstract class AbstractBuffer {
      * Gets the capacity of the buffer.
      *
      * @return the buffer capacity
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public int getCapacity() {
         checkIsNotDestroy();
@@ -279,6 +289,8 @@ public abstract class AbstractBuffer {
     /**
      * Releases all resources associated with this buffer.
      * This method is idempotent and can be called multiple times safely.
+     *
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public void destroy () {
         checkIsNotDestroy();
@@ -300,30 +312,60 @@ public abstract class AbstractBuffer {
 
     }
 
+    /**
+     * Checks whether the buffer is currently running and available for use.
+     * A running buffer can be initiated.
+     *
+     * @return true if the buffer is just created, false otherwise
+     */
     public boolean isReady() {
         return status == StatusCL.READY;
     }
 
+    /**
+     * Checks whether the buffer is currently running and available for use.
+     * A running buffer can execute OpenCL operations and manage resources.
+     *
+     * @return true if the buffer is running, false otherwise
+     */
     public boolean isRunning() {
         return status == StatusCL.RUNNING;
     }
 
+    /**
+     * Checks whether the buffer has been closed and is no longer usable.
+     * A closed buffer cannot execute operations or manage resources.
+     *
+     * @return true if the buffer is closed, false otherwise
+     */
     public boolean isClosed() {
         return status == StatusCL.CLOSED;
     }
 
+    /**
+     * Sets the status of this OpenCL.
+     *
+     * @param newStatus the new status to set, must not be null
+     * @throws IllegalArgumentException if newStatus is null
+     */
     private void setStatus(StatusCL newStatus) {
         if (newStatus == null) {
-            //log
-            //throw
+            throw new IllegalArgumentException("Status cannot be null");
         }
 
         status = newStatus;
     }
 
+    /**
+     * Validates that the buffer has not been closed.
+     * This method is used internally to ensure buffer operations are only
+     * performed on active state.
+     *
+     * @throws BufferDestructionException if the buffer has been closed
+     */
     protected void checkIsNotDestroy () {
         if (isClosed()) {
-            throw new IllegalStateException("");
+            throw new BufferDestructionException("Buffer \"" + bufferName + "\" has been closed.");
         }
     }
 
@@ -337,9 +379,9 @@ public abstract class AbstractBuffer {
             }
         }
 
-        if (openClContext != null && openClContext.getBufferManager() != null) {
+        if (context != null && context.getBufferManager() != null) {
             try {
-                openClContext.getBufferManager().remove(this);
+                context.getBufferManager().remove(this);
             } catch (Exception e) {
                 logger.error("Error removing buffer '{}' from context", bufferName, e);
             }

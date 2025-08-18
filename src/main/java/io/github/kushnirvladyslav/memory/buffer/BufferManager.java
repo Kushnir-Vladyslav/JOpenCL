@@ -31,14 +31,14 @@ import org.slf4j.LoggerFactory;
  *   <li>Buffer lookup by name</li>
  *   <li>Resource cleanup and management</li>
  *   <li>Buffer removal and destruction</li>
- * </ul></p>
+ * </ul>
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>
  * BufferManager manager = new BufferManager();
  * AbstractBuffer buffer = new GlobalDynamicBuffer()
- *     .setBufferName("MyBuffer")
- *     .setDataClass(FloatData.class)
+ *     .withBufferName("MyBuffer")
+ *     .withDataClass(FloatData.class)
  *     .init();
  * manager.registerBuffer(buffer);
  * </pre>

@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Have fixed size after initialization</li>
  *   <li>Use CL_MEM_READ_WRITE flag for full access</li>
  *   <li>Optimized for fixed-size data structures</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Kushnir-Vladyslav

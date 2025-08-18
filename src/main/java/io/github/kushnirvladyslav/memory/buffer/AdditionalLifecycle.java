@@ -16,6 +16,9 @@
 
 package io.github.kushnirvladyslav.memory.buffer;
 
+import io.github.kushnirvladyslav.exceptions.BufferDestructionException;
+import io.github.kushnirvladyslav.exceptions.BufferInitializationException;
+
 /**
  * Interface defining additional lifecycle operations for OpenCL buffers.
  * Implementations can provide custom initialization and cleanup logic
@@ -31,7 +34,7 @@ public interface AdditionalLifecycle {
      * This method is called at the end of the {@link AbstractBuffer#init()} method
      * if the buffer implements this interface.
      *
-     * @throws IllegalStateException if initialization fails
+     * @throws BufferInitializationException if initialization fails
      */
     void additionalInit();
 
@@ -39,6 +42,8 @@ public interface AdditionalLifecycle {
      * Additional cleanup logic to be executed during buffer destruction.
      * This method is called before the base cleanup in {@link AbstractBuffer#destroy()}
      * if the buffer implements this interface.
+     *
+     * @throws BufferDestructionException if the buffer has been closed
      */
     void additionalCleanup();
 }

@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  *
  * <p>The class follows a singleton pattern for OpenCL runtime management and
- * provides thread-safe access to OpenCL resources.</p>
+ * provides thread-safe access to OpenCL resources.
  *
  * @author Vladyslav Kushnir
  * @version 1.0
@@ -103,7 +103,7 @@ public class OpenCL {
      * This method provides a shared context for simple use cases where a custom context
      * is not required. The context is created lazily on first access and is shared
      * between all callers.
-     * </p>
+     * 
      *
      * @return The default OpenCL context
      * @throws DeviceNotFoundException if no suitable OpenCL device is found

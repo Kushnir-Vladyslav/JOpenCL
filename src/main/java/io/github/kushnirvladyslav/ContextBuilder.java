@@ -48,9 +48,9 @@ import org.slf4j.LoggerFactory;
  *     <li>Multi-device context support for parallel computation across multiple devices</li>
  *     <li>Interoperability with other APIs (OpenGL, DirectX, Vulkan)</li>
  *     <li>Other basic functionality/li>
- * </ul></p>
+ * </ul>
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>{@code
  * OpenClContext context = OpenCL.createContext()
  *     .withDevice(device)

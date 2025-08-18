@@ -38,7 +38,7 @@ import java.nio.ByteBuffer;
  *   <li>Only pass data as kernel parameters</li>
  *   <li>Do not support read or write operations</li>
  *   <li>Do not allocate OpenCL memory</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Vladyslav Kushnir
@@ -54,6 +54,7 @@ public class ParameterBuffer
      * Creates a new empty ParameterBuffer.
      */
     public ParameterBuffer () {
+        super();
         logger.debug("Creating new ParameterBuffer instance");
     }
 
@@ -68,8 +69,8 @@ public class ParameterBuffer
         logger.debug("Setting up ParameterBuffer '{}' with parameter of type {}",
                 getBufferName(), dataClass.getSimpleName());
 
-        setDataClass(dataClass);
-        setOpenClContext(context);
+        withDataClass(dataClass);
+        withOpenClContext(context);
         init();
     }
 
@@ -85,9 +86,9 @@ public class ParameterBuffer
         logger.debug("Setting up ParameterBuffer '{}' with parameter of type {}",
                 bufferName, dataClass.getSimpleName());
 
-        setBufferName(bufferName);
-        setDataClass(dataClass);
-        setOpenClContext(context);
+        withBufferName(bufferName);
+        withDataClass(dataClass);
+        withOpenClContext(context);
         init();
     }
 

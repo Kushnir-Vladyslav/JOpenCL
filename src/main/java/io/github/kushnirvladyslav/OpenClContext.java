@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  *     <li>Memory buffer management through BufferManager</li>
  *     <li>Memory kernel management through KernelManager</li>
  *     <li>Resource lifecycle and cleanup</li>
- * </ul></p>
+ * </ul>
  *
  * <p>Current implementation focuses on single-device contexts. Future versions will support:
  * <ul>
@@ -47,9 +47,9 @@ import org.slf4j.LoggerFactory;
  *     <li>Advanced synchronization primitives</li>
  *     <li>Cross-device memory management</li>
  *     <li>Event-based profiling and monitoring</li>
- * </ul></p>
+ * </ul>
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>{@code
  * OpenClContext context = OpenCL.createContext()
  *     .withDevice(device)
@@ -220,7 +220,6 @@ public class OpenClContext {
      * A running context can execute OpenCL operations and manage resources.
      *
      * @return true if the context is running, false otherwise
-     * @throws IllegalStateException if context has been closed
      */
     public boolean isRunning() {
         return status == StatusCL.RUNNING;
@@ -231,7 +230,6 @@ public class OpenClContext {
      * A closed context cannot execute operations or manage resources.
      *
      * @return true if the context is closed, false otherwise
-     * @throws IllegalStateException if context has been closed
      */
     public boolean isClosed() {
         return status == StatusCL.CLOSED;

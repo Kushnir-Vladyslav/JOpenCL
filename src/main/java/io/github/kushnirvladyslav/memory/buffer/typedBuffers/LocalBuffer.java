@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Have faster access than global memory</li>
  *   <li>Don't support host access</li>
  *   <li>Are temporary (exist only during kernel execution)</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Vladyslav Kushnir
@@ -61,9 +61,9 @@ public class LocalBuffer
      */
     public void setup (Class<Data> dataClass, OpenClContext context, int initSize) {
         logger.debug("Setting up LocalBuffer '{}' with size {}", this.getBufferName(), initSize);
-        setDataClass(dataClass);
-        setInitSize(initSize);
-        setOpenClContext(context);
+        withDataClass(dataClass);
+        withInitSize(initSize);
+        withOpenClContext(context);
         init();
     }
 
@@ -77,10 +77,10 @@ public class LocalBuffer
      */
     public void setup (String bufferName, Class<Data> dataClass, OpenClContext context, int initSize) {
         logger.debug("Setting up LocalBuffer '{}' with size {}", bufferName, initSize);
-        setBufferName(bufferName);
-        setDataClass(dataClass);
-        setInitSize(initSize);
-        setOpenClContext(context);
+        withBufferName(bufferName);
+        withDataClass(dataClass);
+        withInitSize(initSize);
+        withOpenClContext(context);
         init();
     }
 

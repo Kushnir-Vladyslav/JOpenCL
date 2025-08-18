@@ -26,9 +26,9 @@ import java.nio.ByteBuffer;
  *
  * <p>Implementations of this interface should handle the conversion of their specific
  * data type to a ByteBuffer format that can be used directly with OpenCL. The conversion
- * should maintain data integrity and handle proper byte ordering.</p>
+ * should maintain data integrity and handle proper byte ordering.
  *
- * <p>Example implementation for float arrays:</p>
+ * <p>Example implementation for float arrays:
  * <pre>
  * public class FloatData implements Data, ConvertToByteBuffer {
  *     {@literal @}Override
@@ -42,7 +42,7 @@ import java.nio.ByteBuffer;
  * }
  * </pre>
  *
- * <p>Important considerations for implementations:</p>
+ * <p>Important considerations for implementations:
  * <ul>
  *   <li>The ByteBuffer should be properly positioned before writing</li>
  *   <li>The implementation should handle boundary checks</li>
@@ -62,7 +62,7 @@ public interface ConvertToByteBuffer {
      * This method is called during OpenCL buffer write operations to prepare data
      * for transfer to the device.
      *
-     * <p>The implementation should:</p>
+     * <p>The implementation should:
      * <ul>
      *   <li>Validate the source object type</li>
      *   <li>Ensure the buffer has sufficient remaining capacity</li>

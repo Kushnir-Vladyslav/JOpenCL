@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Use CL_MEM_READ_WRITE flag by default</li>
  *   <li>Provide basic memory operations</li>
  *   <li>Optimized for fixed-size data structures</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Kushnir-Vladyslav

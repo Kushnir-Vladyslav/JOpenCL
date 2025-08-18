@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Provide dynamic resizing when needed</li>
  *   <li>Use CL_MEM_READ_WRITE flag for full access</li>
  *   <li>Ensure thread-safe operations</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Vladyslav Kushnir

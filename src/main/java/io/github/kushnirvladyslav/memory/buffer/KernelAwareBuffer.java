@@ -16,12 +16,15 @@
 
 package io.github.kushnirvladyslav.memory.buffer;
 
+import io.github.kushnirvladyslav.exceptions.BufferDestructionException;
+import io.github.kushnirvladyslav.exceptions.BufferInitializationException;
+import io.github.kushnirvladyslav.exceptions.BufferOperationException;
 import io.github.kushnirvladyslav.kernel.Kernel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Abstract base class for OpenCL buffers that can be bound to kernels.
@@ -33,7 +36,7 @@ import java.util.Map;
  *   <li>Track kernel bindings</li>
  *   <li>Manage kernel argument indices</li>
  * </ul>
- * </p>
+ * 
  *
  * @since 1.0
  * @author Vladyslav Kushnir
@@ -54,7 +57,7 @@ public abstract class KernelAwareBuffer
      */
     protected KernelAwareBuffer() {
         super();
-        this.kernelBindings = new HashMap<>();
+        this.kernelBindings = new ConcurrentHashMap<>();
         logger.debug("Created new KernelAwareBuffer instance");
     }
 
@@ -64,9 +67,11 @@ public abstract class KernelAwareBuffer
      * @param kernel the OpenCL kernel instance
      * @param argIndex the index of the kernel argument
      * @throws IllegalArgumentException if the kernel is null or argIndex is negative
-     * @throws IllegalStateException if the buffer is not initialized or binding fails
+     * @throws BufferInitializationException if the buffer is not initialized or binding fails
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public void bindKernel(Kernel kernel, int argIndex) {
+        checkIsNotDestroy();
         if (kernel == null) {
             String message = String.format("Kernel cannot be null for buffer '%s'", getBufferName());
             logger.error(message);
@@ -81,13 +86,13 @@ public abstract class KernelAwareBuffer
      * @param kernel the OpenCL kernel to bind to
      * @param argIndex the index of the kernel argument
      * @throws IllegalArgumentException if the kernel is invalid or argIndex is negative
-     * @throws IllegalStateException if the buffer is not initialized or binding fails
+     * @throws BufferOperationException if the buffer is not initialized or binding fails
      */
     public void bindKernel(long kernel, int argIndex) {
-        if (!isInitialized()) {
+        if (isRunning()) {
             String message = String.format("Cannot bind uninitialized buffer '%s' to kernel", getBufferName());
             logger.error(message);
-            throw new IllegalStateException(message);
+            throw new BufferOperationException(message);
         }
 
         if (kernel == 0) {
@@ -109,7 +114,7 @@ public abstract class KernelAwareBuffer
         } catch (Exception e) {
             String message = String.format("Failed to bind buffer '%s' to kernel", getBufferName());
             logger.error(message, e);
-            throw new IllegalStateException(message, e);
+            throw new BufferOperationException(message, e);
         }
     }
 
@@ -203,7 +208,6 @@ public abstract class KernelAwareBuffer
     public void additionalCleanup() {
         logger.debug("Performing additional cleanup for KernelAwareBuffer '{}'", getBufferName());
 
-        // Очищення всіх прив'язок до ядер
         if (!kernelBindings.isEmpty()) {
             logger.debug("Cleaning up {} kernel bindings for buffer '{}'",
                     kernelBindings.size(), getBufferName());
@@ -215,8 +219,13 @@ public abstract class KernelAwareBuffer
      * Updates the kernel argument for this buffer in all bound kernels.
      * This method automatically updates all kernels where this buffer is bound
      * with their previously assigned argument indices.
+     *
+     * @throws BufferDestructionException if the buffer has been closed
+     * @throws BufferOperationException if failed to pass arguments
      */
     public void setAllKernelArgs() {
+        checkIsNotDestroy();
+
         for (Map.Entry<Long, Integer> binding : kernelBindings.entrySet()) {
             try {
                 setKernelArg(binding.getKey(), binding.getValue());

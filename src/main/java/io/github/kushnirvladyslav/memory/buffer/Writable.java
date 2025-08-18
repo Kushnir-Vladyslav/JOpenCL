@@ -31,7 +31,7 @@ import java.nio.ByteBuffer;
  *
  * <p>This interface implements write operations for OpenCL buffers by working in conjunction
  * with {@link AbstractGlobalBuffer}. It provides complete implementation of write operations
- * without requiring additional implementation from implementing classes.</p>
+ * without requiring additional implementation from implementing classes.
  *
  * @param <T> The type of buffer that implements this interface
  * @author Vladyslav Kushnir
@@ -128,7 +128,7 @@ public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
                     arrSize, buffer.getBufferName(), offset);
 
             int errorCode = CL10.clEnqueueWriteBuffer(
-                    buffer.openClContext.getCommandQueue(),
+                    buffer.context.getCommandQueue(),
                     buffer.clBuffer,
                     true,
                     offset * dataSize,
@@ -238,7 +238,7 @@ public interface Writable<T extends AbstractGlobalBuffer & Writable<T>> {
                 num, buffer.getBufferName(), index);
 
         int errorCode = CopyDataBufferToBuffer.copyData(
-                buffer.openClContext,
+                buffer.context,
                 buffer.clBuffer,
                 buffer.clBuffer,
                 (index + num) * dataSize,

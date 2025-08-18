@@ -16,7 +16,9 @@
 
 package io.github.kushnirvladyslav.memory.buffer;
 
+import io.github.kushnirvladyslav.exceptions.BufferOperationException;
 import io.github.kushnirvladyslav.memory.util.CopyDataBufferToBuffer;
+import io.github.kushnirvladyslav.util.OpenCLErrorUtils;
 import org.lwjgl.opencl.CL10;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * <p>This interface implements dynamic resizing functionality for OpenCL buffers
  * by working in conjunction with {@link AbstractGlobalBuffer}. It provides complete
  * implementation of resize operations without requiring additional implementation
- * from implementing classes.</p>
+ * from implementing classes.
  *
  * @param <T> the concrete buffer type that implements this interface
  * @author Vladyslav Kushnir
@@ -99,6 +101,7 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
      * Uses the capacity multiplier to determine the new size.
      *
      * @param newCapacity the minimum required capacity
+     * @throws BufferOperationException memory allocation error on device
      */
     default void increase(int newCapacity) {
         @SuppressWarnings("unchecked")
@@ -113,7 +116,7 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
                 buffer.clBuffer = buffer.createClBuffer();
 
                 int errorCode = CopyDataBufferToBuffer.copyData(
-                        buffer.openClContext,
+                        buffer.context,
                         oldClBuffer,
                         buffer.getClBuffer(),
                         currentCapacity
@@ -121,16 +124,16 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
 
                 if (errorCode != CL10.CL_SUCCESS) {
                     String message = String.format(
-                            "Failed to copy data during buffer increase: OpenCL error code %d",
-                            errorCode);
+                            "Failed to copy data during buffer increase: OpenCL error - %s",
+                            OpenCLErrorUtils.getCLErrorString(errorCode));
                     logger.error(message);
-                    throw new IllegalStateException(message);
+                    throw new BufferOperationException(message, errorCode);
                 }
 
                 errorCode = CL10.clReleaseMemObject(oldClBuffer);
                 if (errorCode != CL10.CL_SUCCESS) {
-                    logger.warn("Failed to release old buffer memory object: OpenCL error code {}",
-                            errorCode);
+                    logger.warn("Failed to release old buffer memory object: OpenCL error - {}",
+                            OpenCLErrorUtils.getCLErrorString(errorCode));
                 }
 
                 buffer.setAllKernelArgs();
@@ -138,7 +141,7 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
                 CL10.clReleaseMemObject(buffer.clBuffer);
                 buffer.clBuffer = oldClBuffer;
                 buffer.capacity = currentCapacity;
-                throw new IllegalStateException("Failed to increase buffer size", e);
+                throw new BufferOperationException("Failed to increase buffer size", e);
             }
         }
     }
@@ -148,6 +151,7 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
      * Only decreases if the requested capacity is smaller than current.
      *
      * @param newCapacity the new capacity for the buffer
+     * @throws BufferOperationException memory allocation error on device
      */
     default void decrease(int newCapacity) {
         @SuppressWarnings("unchecked")
@@ -168,23 +172,23 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
                 buffer.clBuffer = buffer.createClBuffer();
 
                 int errorCode = CopyDataBufferToBuffer.copyData(
-                        buffer.openClContext,
+                        buffer.context,
                         oldClBuffer,
                         buffer.clBuffer,
                         newCapacity);
 
                 if (errorCode != CL10.CL_SUCCESS) {
                     String message = String.format(
-                            "Failed to copy data during buffer decrease: OpenCL error code %d",
-                            errorCode);
+                            "Failed to copy data during buffer decrease: OpenCL error - %d",
+                            OpenCLErrorUtils.getCLErrorString(errorCode));
                     logger.error(message);
-                    throw new IllegalStateException(message);
+                    throw new BufferOperationException(message);
                 }
 
                 errorCode = CL10.clReleaseMemObject(oldClBuffer);
                 if (errorCode != CL10.CL_SUCCESS) {
-                    logger.warn("Failed to release old buffer memory object: OpenCL error code {}",
-                            errorCode);
+                    logger.warn("Failed to release old buffer memory object: OpenCL error - {}",
+                            OpenCLErrorUtils.getCLErrorString(errorCode));
                 }
 
                 buffer.setAllKernelArgs();
@@ -193,7 +197,7 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
                 CL10.clReleaseMemObject(buffer.clBuffer);
                 buffer.clBuffer = oldClBuffer;
                 buffer.capacity = currentCapacity;
-                throw new IllegalStateException("Failed to decrease buffer size", e);
+                throw new BufferOperationException("Failed to decrease buffer size", e);
             }
         }
     }
@@ -202,6 +206,8 @@ public interface Dynamical<T extends AbstractGlobalBuffer & Dynamical<T>> {
      * Compacts the buffer by reducing its size to match the current data size.
      * This is useful when the amount of data has significantly decreased and
      * is expected to stay small, helping to free unused memory.
+     *
+     * @throws BufferOperationException memory allocation error on device
      */
     default void compact() {
         @SuppressWarnings("unchecked")

@@ -33,9 +33,9 @@ import java.util.Arrays;
  *
  * <p>This class provides conversion and buffer management for character data,
  * supporting both primitive and boxed types. It includes optimized handling for
- * different input formats while maintaining type safety and null checking.</p>
+ * different input formats while maintaining type safety and null checking.
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>
  * CharData charData = new CharData();
  *

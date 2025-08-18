@@ -25,9 +25,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This interface provides a foundation for all data types that can be used with OpenCL buffers.
  * It includes default implementations for common operations and validations, while allowing
- * implementations to focus on type-specific logic.</p>
+ * implementations to focus on type-specific logic.
  *
- * <p>Example implementation:</p>
+ * <p>Example implementation:
  * <pre>
  * public class FloatData implements Data {
  *     {@literal @}Override

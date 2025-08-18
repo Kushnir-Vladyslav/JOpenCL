@@ -16,8 +16,10 @@
 
 package io.github.kushnirvladyslav.memory.buffer;
 
+import io.github.kushnirvladyslav.exceptions.BufferOperationException;
 import io.github.kushnirvladyslav.memory.data.ConvertFromByteBuffer;
 import io.github.kushnirvladyslav.memory.data.Data;
+import io.github.kushnirvladyslav.util.OpenCLErrorUtils;
 import org.lwjgl.opencl.CL10;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
@@ -31,9 +33,9 @@ import java.nio.ByteBuffer;
  *
  * <p>This interface provides a complete implementation of read operations without requiring
  * additional implementation from implementing classes. It supports both object-based
- * and byte-based reading operations with various options for offset and length.</p>
+ * and byte-based reading operations with various options for offset and length.
  *
- * <p>Example usage:</p>
+ * <p>Example usage:
  * <pre>
  * // Read entire buffer
  * Object data = buffer.read();
@@ -59,6 +61,8 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * otherwise creates a new array and copies the data.
      *
      * @return Object containing the read data
+     * @throws IllegalArgumentException if any parameters are invalid
+     * @throws BufferOperationException if the read operation fails
      */
     default Object read() {
         @SuppressWarnings("unchecked")
@@ -86,6 +90,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param targetArray The array where the data will be stored
      * @return The target array filled with data from the buffer
      * @throws IllegalArgumentException if targetArray is null
+     * @throws BufferOperationException if the read operation fails
      */
     default Object read(Object targetArray) {
         @SuppressWarnings("unchecked")
@@ -108,6 +113,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param offset Starting position in the buffer to read from
      * @return New array containing the read data
      * @throws IllegalArgumentException if offset is negative or beyond buffer size
+     * @throws BufferOperationException if the read operation fails
      */
     default Object read(int offset) {
         @SuppressWarnings("unchecked")
@@ -135,6 +141,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param targetArray The array where the data will be stored
      * @return The target array filled with data from the buffer
      * @throws IllegalArgumentException if offset is negative or targetArray is null
+     * @throws BufferOperationException if the read operation fails
      */
     default Object read(int offset, Object targetArray) {
         @SuppressWarnings("unchecked")
@@ -165,6 +172,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param len    Number of elements to read
      * @return New array containing the read data
      * @throws IllegalArgumentException if offset or length parameters are invalid
+     * @throws BufferOperationException if the read operation fails
      */
     default Object read(int offset, int len) {
         @SuppressWarnings("unchecked")
@@ -199,7 +207,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param targetArray The array where the data will be stored
      * @return The target array filled with data from the buffer
      * @throws IllegalArgumentException if any parameters are invalid
-     * @throws IllegalStateException    if the read operation fails
+     * @throws BufferOperationException if the read operation fails
      */
     default Object read(int offset, int len, Object targetArray) {
         @SuppressWarnings("unchecked")
@@ -228,7 +236,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
             } else {
                 tempNativeBuffer = MemoryUtil.memAlloc(len * data.getSizeStruct());
                 if (tempNativeBuffer == null) {
-                    throw new IllegalStateException("Failed to allocate temporary native buffer");
+                    throw new IllegalArgumentException("Failed to allocate temporary native buffer");
                 }
             }
 
@@ -236,7 +244,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                     len, buffer.getBufferName(), offset);
 
             int errorCode = CL10.clEnqueueReadBuffer(
-                    buffer.openClContext.getCommandQueue(),
+                    buffer.context.getCommandQueue(),
                     buffer.clBuffer,
                     true,
                     offset * data.getSizeStruct(),
@@ -247,10 +255,10 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
 
             if (errorCode != CL10.CL_SUCCESS) {
                 String message = String.format(
-                        "OpenCL read buffer failed for buffer '%s': error code %d",
-                        buffer.getBufferName(), errorCode);
+                        "OpenCL read buffer failed for buffer '%s': error - %s",
+                        buffer.getBufferName(), OpenCLErrorUtils.getCLErrorString(errorCode));
                 logger.error(message);
-                throw new IllegalStateException(message);
+                throw new BufferOperationException(message, errorCode);
             }
 
             converter.convertFromByteBuffer((ByteBuffer) tempNativeBuffer.rewind(), targetArray);
@@ -264,7 +272,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
         } catch (Exception e) {
             String message = String.format("Failed to read from buffer '%s'", buffer.getBufferName());
             logger.error(message, e);
-            throw new IllegalStateException(message, e);
+            throw new BufferOperationException(message, e);
         } finally {
             if (!buffer.copyHostBuffer && tempNativeBuffer != null) {
                 MemoryUtil.memFree(tempNativeBuffer);
@@ -277,7 +285,9 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * This operation is only available for dynamic buffers.
      *
      * @return ByteBuffer containing the read data
-     * @throws IllegalStateException if the buffer is not dynamic
+     * @throws BufferOperationException if the buffer is not dynamic
+     * @throws IllegalArgumentException if any parameters are invalid
+     * @throws BufferOperationException if the read operation fails
      */
     default ByteBuffer readBytes() {
         @SuppressWarnings("unchecked")
@@ -287,7 +297,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                     "Buffer '%s' is not dynamic, cannot perform byte-based read operation",
                     buffer.getBufferName());
             logger.error(message);
-            throw new IllegalStateException(message);
+            throw new BufferOperationException(message);
         }
 
         logger.debug("Reading entire buffer '{}' as bytes", buffer.getBufferName());
@@ -300,6 +310,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param tempNativeBuffer The ByteBuffer where the data will be stored
      * @return The provided ByteBuffer filled with data from the buffer
      * @throws IllegalArgumentException if tempNativeBuffer is null
+     * @throws BufferOperationException if the read operation fails
      */
     default ByteBuffer readBytes(ByteBuffer tempNativeBuffer) {
         if (tempNativeBuffer == null) {
@@ -319,6 +330,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @return ByteBuffer containing the read data
      * @throws IllegalStateException    if the buffer is not dynamic
      * @throws IllegalArgumentException if offset is invalid
+     * @throws BufferOperationException if the read operation fails
      */
     default ByteBuffer readBytes(int offset) {
         @SuppressWarnings("unchecked")
@@ -360,7 +372,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
      * @param tempNativeBuffer The ByteBuffer where the data will be stored
      * @return The provided ByteBuffer filled with data from the buffer
      * @throws IllegalArgumentException if any parameters are invalid
-     * @throws IllegalStateException    if the read operation fails
+     * @throws BufferOperationException if the read operation fails
      */
     default ByteBuffer readBytes(int offset, ByteBuffer tempNativeBuffer) {
         @SuppressWarnings("unchecked")
@@ -393,7 +405,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
                     tempNativeBuffer.capacity(), buffer.getBufferName(), offset);
 
             int errorCode = CL10.clEnqueueReadBuffer(
-                    buffer.openClContext.getCommandQueue(),
+                    buffer.context.getCommandQueue(),
                     buffer.clBuffer,
                     true,
                     offset * data.getSizeStruct(),
@@ -404,10 +416,10 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
 
             if (errorCode != CL10.CL_SUCCESS) {
                 String message = String.format(
-                        "OpenCL read buffer failed for buffer '%s': error code %d",
-                        buffer.getBufferName(), errorCode);
+                        "OpenCL read buffer failed for buffer '%s': error - %s",
+                        buffer.getBufferName(), OpenCLErrorUtils.getCLErrorString(errorCode));
                 logger.error(message);
-                throw new IllegalStateException(message);
+                throw new BufferOperationException(message, errorCode);
             }
 
             return tempNativeBuffer;
@@ -415,7 +427,7 @@ public interface Readable<T extends AbstractGlobalBuffer & Readable<T>> {
             String message = String.format("Failed to read bytes from buffer '%s'",
                     buffer.getBufferName());
             logger.error(message, e);
-            throw new IllegalStateException(message, e);
+            throw new BufferOperationException(message, e);
         }
     }
 }

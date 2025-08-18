@@ -16,12 +16,20 @@
 
 package io.github.kushnirvladyslav.memory.buffer;
 
+import io.github.kushnirvladyslav.exceptions.BufferDestructionException;
+import io.github.kushnirvladyslav.exceptions.BufferInitializationException;
+import io.github.kushnirvladyslav.exceptions.BufferOperationException;
 import io.github.kushnirvladyslav.memory.data.ConvertFromByteBuffer;
 import io.github.kushnirvladyslav.memory.data.ConvertToByteBuffer;
 import io.github.kushnirvladyslav.memory.data.Data;
 import io.github.kushnirvladyslav.OpenClContext;
+import io.github.kushnirvladyslav.memory.util.DeviceMemoryAccess;
+import io.github.kushnirvladyslav.memory.util.HostMemoryAccess;
+import io.github.kushnirvladyslav.util.CLVersion;
+import io.github.kushnirvladyslav.util.OpenCLErrorUtils;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.opencl.CL10;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +46,7 @@ import java.nio.IntBuffer;
  *   <li>Dynamic buffer resizing</li>
  *   <li>Host buffer copying</li>
  *   <li>OpenCL memory flags management</li>
- * </ul></p>
+ * </ul>
  *
  * @since 1.0
  * @author Vladyslav Kushnir
@@ -51,7 +59,8 @@ public abstract class AbstractGlobalBuffer
     protected boolean copyHostBuffer = false;
     protected boolean copyNativeBuffer = false;
 
-    protected long flags = 0;
+    protected DeviceMemoryAccess deviceMemoryAccess = DeviceMemoryAccess.READ_WRIGHT;
+    protected HostMemoryAccess hostMemoryAccess = HostMemoryAccess.READ_WRIGHT;
     protected long clBuffer = 0;
 
     protected Object hostBuffer = null;
@@ -63,20 +72,55 @@ public abstract class AbstractGlobalBuffer
      * Creates a new AbstractGlobalBuffer with default read-write access.
      */
     public AbstractGlobalBuffer() {
-        setFlags(CL10.CL_MEM_READ_WRITE);
+        super();
     }
 
     /**
-     * Sets the OpenCL memory flags for this buffer.
+     * Sets the OpenCL device memory access flags for this buffer.
      *
-     * @param newFlags the OpenCL memory flags to set
+     * @param deviceMemoryAccess the OpenCL device memory access flags to set
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
+     * @throws IllegalArgumentException if the DeviceMemoryAccess is null
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public AbstractBuffer setFlags(long newFlags) {
+    public AbstractGlobalBuffer withDeviceMemoryAccess(DeviceMemoryAccess deviceMemoryAccess) {
         readyForInit();
-        logger.debug("Setting OpenCL memory flags to {} for buffer '{}'", newFlags, getBufferName());
-        flags = newFlags;
+
+        if (deviceMemoryAccess == null) {
+            String message = String.format("Device memory access cannot be null for buffer '%s'", getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
+
+        logger.debug("Setting OpenCL device memory access to {} for buffer '{}'", deviceMemoryAccess.name(), getBufferName());
+        this.deviceMemoryAccess = deviceMemoryAccess;
+
+        return this;
+    }
+
+    /**
+     * Sets the OpenCL host memory access flags for this buffer.
+     *
+     * @param hostMemoryAccess the OpenCL host memory access flags to set
+     * @return this buffer instance for method chaining
+     * @throws BufferInitializationException if the buffer has already been initiated
+     * @throws IllegalArgumentException if the DeviceMemoryAccess is null
+     * @throws BufferDestructionException if the buffer has been closed
+     */
+    public AbstractGlobalBuffer withHostMemoryAccess(HostMemoryAccess hostMemoryAccess) {
+        readyForInit();
+
+        if (hostMemoryAccess == null) {
+            String message = String.format("Host memory access cannot be null for buffer '%s'", getBufferName());
+            logger.error(message);
+            throw new IllegalArgumentException(message);
+        }
+
+
+
+        logger.debug("Setting OpenCL host memory access to {} for buffer '{}'", deviceMemoryAccess.name(), getBufferName());
+        this.hostMemoryAccess = hostMemoryAccess;
 
         return this;
     }
@@ -86,9 +130,10 @@ public abstract class AbstractGlobalBuffer
      *
      * @param isProjection true to maintain a host copy, false otherwise
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public AbstractBuffer setCopyHostBuffer(boolean isProjection) {
+    public AbstractGlobalBuffer withCopyHostBuffer(boolean isProjection) {
         readyForInit();
         logger.debug("Setting copyHostBuffer to {} for buffer '{}'", isProjection, getBufferName());
         copyHostBuffer = isProjection;
@@ -101,9 +146,10 @@ public abstract class AbstractGlobalBuffer
      *
      * @param copyNativeBuffer true to maintain a native copy, false otherwise
      * @return this buffer instance for method chaining
-     * @throws IllegalStateException if the buffer has already been initiated
+     * @throws BufferInitializationException if the buffer has already been initiated
+     * @throws BufferDestructionException if the buffer has been closed
      */
-    public AbstractBuffer setCopyNativeBuffer(boolean copyNativeBuffer) {
+    public AbstractGlobalBuffer withCopyNativeBuffer(boolean copyNativeBuffer) {
         readyForInit();
         logger.debug("Setting copyNativeBuffer to {} for buffer '{}'", copyNativeBuffer, getBufferName());
         this.copyNativeBuffer = copyNativeBuffer;
@@ -147,6 +193,11 @@ public abstract class AbstractGlobalBuffer
             if (!(dataObject instanceof ConvertToByteBuffer)) {
                 throwInitError("Data class must implement ConvertToByteBuffer interface for writable buffers");
             }
+        }
+
+        if (hostMemoryAccess != HostMemoryAccess.READ_WRIGHT &&
+                !context.getDevice().getOpenCLVersion().isAtLeast(CLVersion.OPENCL_1_2)) {
+            hostMemoryAccess = HostMemoryAccess.READ_WRIGHT;
         }
     }
 
@@ -192,7 +243,7 @@ public abstract class AbstractGlobalBuffer
      * Creates an OpenCL buffer with the current configuration.
      *
      * @return the handle to the created OpenCL buffer
-     * @throws IllegalStateException if buffer creation fails
+     * @throws BufferInitializationException if buffer creation fails
      */
     protected long createClBuffer() {
         if (capacity < 1) {
@@ -202,29 +253,30 @@ public abstract class AbstractGlobalBuffer
             throw new IllegalStateException(message);
         }
 
-        IntBuffer errorCode = MemoryUtil.memAllocInt(1);
-        long newClBuffer = CL10.clCreateBuffer(
-                openClContext.getContext(),
-                flags,
-                capacity * dataObject.getSizeStruct(),
-                errorCode
-        );
+        long newClBuffer;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
 
-        if (errorCode.get(0) != CL10.CL_SUCCESS) {
-            String message = String.format(
-                    "Failed to create OpenCL buffer '%s': error code %d",
-                    getBufferName(), errorCode.get(0));
-            logger.error(message);
-            MemoryUtil.memFree(errorCode);
-            throw new IllegalStateException(message);
-        }
+            IntBuffer errorCode = stack.mallocInt(1);
+            newClBuffer = CL10.clCreateBuffer(
+                    context.getContext(),
+                    deviceMemoryAccess.getFlag() | hostMemoryAccess.getFlag(),
+                    capacity * dataObject.getSizeStruct(),
+                    errorCode
+            );
 
-        MemoryUtil.memFree(errorCode);
+            if (errorCode.get(0) != CL10.CL_SUCCESS) {
+                String message = String.format(
+                        "Failed to create OpenCL buffer '%s' with error: '%s'",
+                        getBufferName(), OpenCLErrorUtils.getCLErrorString(errorCode.get(0)));
+                logger.error(message);
+                throw new BufferInitializationException(message, errorCode.get(0));
+            }
 
-        if (newClBuffer == 0) {
-            String message = String.format("Failed to create OpenCL buffer for '%s'", getBufferName());
-            logger.error(message);
-            throw new IllegalStateException(message);
+            if (newClBuffer == 0) {
+                String message = String.format("Failed to create OpenCL buffer for '%s'", getBufferName());
+                logger.error(message);
+                throw new BufferInitializationException(message);
+            }
         }
 
         return newClBuffer;
@@ -239,6 +291,8 @@ public abstract class AbstractGlobalBuffer
      * @param copyNativeBuffer whether to maintain a native buffer copy
      * @param copyHostBuffer whether to maintain a host buffer copy
      * @param initSize initial buffer size
+     * @throws BufferInitializationException if any required settings are missing or invalid
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public <T extends Data> void setup (Class<T> clazz,
                        OpenClContext context,
@@ -246,11 +300,11 @@ public abstract class AbstractGlobalBuffer
                        boolean copyHostBuffer,
                        int initSize) {
         logger.debug("Setting up buffer '{}' with size {}", getBufferName(), initSize);
-        setDataClass(clazz);
-        setOpenClContext(context);
-        setCopyNativeBuffer(copyNativeBuffer);
-        setCopyHostBuffer(copyHostBuffer);
-        setInitSize(initSize);
+        withDataClass(clazz);
+        withOpenClContext(context);
+        withCopyNativeBuffer(copyNativeBuffer);
+        withCopyHostBuffer(copyHostBuffer);
+        withInitSize(initSize);
         init();
     }
 
@@ -274,6 +328,8 @@ public abstract class AbstractGlobalBuffer
      * @param copyNativeBuffer whether to maintain a native buffer copy
      * @param copyHostBuffer whether to maintain a host buffer copy
      * @param initSize initial buffer size
+     * @throws BufferInitializationException if any required settings are missing or invalid
+     * @throws BufferDestructionException if the buffer has been closed
      */
     public <T extends Data> void setup (String bufferName,
                        Class<T> clazz,
@@ -282,12 +338,12 @@ public abstract class AbstractGlobalBuffer
                        boolean copyHostBuffer,
                        int initSize) {
         logger.debug("Setting up buffer with name '{}' and size {}", bufferName, initSize);
-        setBufferName(bufferName);
-        setDataClass(clazz);
-        setOpenClContext(context);
-        setCopyNativeBuffer(copyNativeBuffer);
-        setCopyHostBuffer(copyHostBuffer);
-        setInitSize(initSize);
+        withBufferName(bufferName);
+        withDataClass(clazz);
+        withOpenClContext(context);
+        withCopyNativeBuffer(copyNativeBuffer);
+        withCopyHostBuffer(copyHostBuffer);
+        withInitSize(initSize);
         init();
     }
 
@@ -302,10 +358,10 @@ public abstract class AbstractGlobalBuffer
 
         if (errorCode != CL10.CL_SUCCESS) {
             String message = String.format(
-                    "Failed to set kernel argument for buffer '%s' at index %d: error code %d",
-                    getBufferName(), argIndex, errorCode);
+                    "Failed to set kernel argument for buffer '%s' at index %d: error  %s",
+                    getBufferName(), argIndex, OpenCLErrorUtils.getCLErrorString(errorCode));
             logger.error(message);
-            throw new IllegalStateException(message);
+            throw new BufferOperationException(message, errorCode);
         }
     }
 
@@ -327,13 +383,12 @@ public abstract class AbstractGlobalBuffer
         }
 
         size = -1;
-        flags = 0;
 
         if (clBuffer != 0) {
             int errorCode = CL10.clReleaseMemObject(clBuffer);
             if (errorCode != CL10.CL_SUCCESS) {
-                logger.warn("Failed to release OpenCL buffer '{}': error code {}",
-                        getBufferName(), errorCode);
+                logger.warn("Failed to release OpenCL buffer '{}': error  {}",
+                        getBufferName(), OpenCLErrorUtils.getCLErrorString(errorCode));
             }
             clBuffer = 0;
         }
